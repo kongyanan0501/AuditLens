@@ -1,0 +1,40 @@
+---
+description: 审计引擎与 LangGraph 服务端模块
+globs: server/**
+alwaysApply: false
+---
+
+# Server Audit Engine
+
+## 模块分工
+
+| 文件 | 职责 |
+|------|------|
+| `langgraph.ts` | Graph 定义、节点注册、state 流转 |
+| `audit-engine.ts` | 对外入口、RiskScoring |
+| `rules.ts` | 确定性规则（重复、审批缺失） |
+| `anomaly.ts` | 统计异常（金额、供应商集中） |
+| `rag.ts` | 向量检索 + 上下文组装 |
+
+## LangGraph 节点顺序
+
+```text
+ParseExcel → RuleCheck → AnomalyDetection → RiskScoring → RAGExplain → ReportGeneration
+```
+
+修改节点顺序时同步更新 `types/audit.ts` 的 GraphState 与 `PROJECT.md`。
+
+## 编码要求
+
+- 规则/异常函数优先纯函数，便于单测
+- 节点函数：接收 state → 返回 state 增量（spread 合并）
+- 文件解析在 ParseExcel 节点完成，输出 `Record[]`（见 `types/audit.ts`）
+
+## 评分公式（MVP）
+
+`score = 100 - duplicates*10 - anomalies*5 - missingApproval*8`
+
+## 禁止
+
+- import React、`next/navigation`、client hooks
+- 在节点内直接 `new OpenAI()` — 使用 `lib/ai-provider.ts`

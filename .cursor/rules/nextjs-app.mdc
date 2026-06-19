@@ -1,0 +1,38 @@
+---
+description: Next.js 页面与 UI 组件约定
+globs: app/**,components/**,hooks/**
+alwaysApply: false
+---
+
+# Next.js UI Layer
+
+## 组件
+
+- 函数组件 + named export
+- Props 接口定义在组件文件顶部
+- 使用 shadcn/ui + Tailwind；主色 `#1E3A8A`
+
+## Client / Server
+
+- 默认 Server Component；需要交互时加 `"use client"`
+- 不在 client 组件调用 LLM、Pinecone、LangGraph
+- 数据变更通过 `app/api/` Route Handler
+
+## 页面职责
+
+| 路径 | 职责 |
+|------|------|
+| `app/login` | Supabase 登录 |
+| `app/dashboard` | KPI、图表、Issue 列表 |
+| `app/upload` | 文件上传与触发分析 |
+| `app/report/[id]` | 报告展示 |
+
+## API Route
+
+- 薄层：鉴权 → 校验 → 委托 `server/audit-engine.ts` 或 `server/langgraph.ts`
+- 返回 `{ data }` 或 `{ error, code }`
+
+## 禁止
+
+- 在 `components/` 写规则检测、异常算法
+- 在页面内硬编码 Supabase service role key

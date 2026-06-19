@@ -1,0 +1,43 @@
+---
+description: AI Provider、向量库与 RAG 层约定
+globs: lib/ai-provider.ts,lib/pinecone.ts,server/rag.ts,server/langgraph.ts
+alwaysApply: false
+---
+
+# AI Layer
+
+## 接口契约
+
+```ts
+interface LLMProvider {
+  chat(input: string): Promise<string>;
+  embed(input: string): Promise<number[]>;
+}
+
+interface VectorStore {
+  upsert(vectors: VectorRecord[]): Promise<void>;
+  search(query: number[]): Promise<SearchResult[]>;
+}
+```
+
+## 工厂模式
+
+- `lib/ai-provider.ts`：根据 `AI_PROVIDER` env 返回实现
+- `lib/pinecone.ts`：Pinecone 实现 `VectorStore`
+- 新增 Provider：实现接口 → 注册工厂 → 更新 `.env.example`
+
+## RAG 流程
+
+```text
+risk context → embed → Pinecone query (topK=5) → 拼接 policy context → LLM chat
+```
+
+## LangGraph 集成
+
+- RAGExplain 节点调用 `server/rag.ts`，不内联 prompt 超过 50 行
+- ReportGeneration 使用 chat，embed 仅用于检索
+
+## 禁止
+
+- 硬编码 model 名称散落多处 — 集中 env 或常量
+- 在 client bundle 引入 `@pinecone-database/pinecone` 或 LLM SDK

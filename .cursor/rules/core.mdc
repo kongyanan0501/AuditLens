@@ -1,0 +1,38 @@
+---
+description: AuditLens 全局编码标准与模块边界
+alwaysApply: true
+---
+
+# AuditLens Core
+
+## 原则
+
+- 最小 diff：只改任务相关文件，不做无关重构
+- TypeScript strict；领域类型放 `types/audit.ts`
+- 代码/标识符英文；面向用户的 UI 文案中文
+
+## 依赖方向（强制）
+
+```text
+app/ → server/ → lib/
+app/ → components/
+types/ ← 所有层（types 不 import 业务代码）
+```
+
+禁止：`server/` import `components/`；`lib/` import `server/`。
+
+## 修改前
+
+1. 查 `todo.md` 当前 Phase
+2. 查 `PROJECT.md` 定位模块
+3. 完成后跑 `npm run lint` 和 `npm run build`
+
+## 安全
+
+- 禁止硬编码 API Key
+- 禁止 client 组件使用 `OPENAI_API_KEY` / `PINECONE_API_KEY`
+- `audit_*` 查询必须按 `user_id` 过滤
+
+## 可插拔
+
+LLM 与向量库只通过 `lib/ai-provider.ts`、`lib/pinecone.ts` 工厂获取，不在业务节点内直接实例化 SDK。
