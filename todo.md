@@ -58,11 +58,11 @@
 
 ## Phase 4 — 可插拔 AI 基础设施
 
-- [ ] `lib/ai-provider.ts` — `LLMProvider` 接口 + 工厂
-- [ ] 实现 `OpenAIProvider`（chat + embed）
-- [ ] （可选）`DeepSeekProvider` 占位
-- [ ] `lib/pinecone.ts` — `VectorStore` 接口 + Pinecone 实现
-- [ ] 单元 smoke：provider 工厂在缺 key 时优雅报错
+- [x] `lib/ai-provider.ts` — `LLMProvider` 接口 + 工厂
+- [x] 实现 `OpenAIProvider`（chat + embed）
+- [x] （可选）`DeepSeekProvider` 占位
+- [x] `lib/pinecone.ts` — `VectorStore` 接口 + Pinecone 实现
+- [x] 单元 smoke：provider 工厂在缺 key 时优雅报错
 
 **完成标准**：`server/` 仅通过工厂获取 LLM/向量客户端。
 
@@ -143,11 +143,11 @@
 | 1 | 类型与数据模型 | `[x]` |
 | 2 | 认证与路由保护 | `[x]` |
 | 3 | UI 骨架 | `[x]` |
-| 4 | AI 基础设施 | `[ ]` |
+| 4 | AI 基础设施 | `[x]` |
 | 5 | 审计引擎 | `[ ]` |
 | 6 | LangGraph | `[ ]` |
 | 7 | RAG + LLM | `[ ]` |
 | 8 | 报告与 Dashboard | `[ ]` |
 | 9 | 打磨与交付 | `[ ]` |
 
-**最后更新**：2026-06-21 — Phase 3 UI 骨架完成
+**最后更新**：2026-06-21 — Phase 4 可插拔 AI 基础设施完成

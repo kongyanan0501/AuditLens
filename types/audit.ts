@@ -80,6 +80,20 @@ export type KnowledgeEntry = {
   createdAt: string;
 };
 
+/** Vector upsert payload for Pinecone / VectorStore */
+export type VectorRecord = {
+  id: string;
+  values: number[];
+  metadata?: Record<string, unknown>;
+};
+
+/** Vector similarity search hit */
+export type SearchResult = {
+  id: string;
+  score: number;
+  metadata?: Record<string, unknown>;
+};
+
 /** LangGraph state passed between pipeline nodes */
 export type AuditGraphState = {
   taskId?: string;
