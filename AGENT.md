@@ -98,7 +98,31 @@ npm run dev          # 本地开发 http://localhost:3000
 npm run build        # 生产构建
 npm run lint         # ESLint
 npm run typecheck    # tsc --noEmit（若已配置）
+npm run codegraph:sync  # major 版本变更后重建 CodeGraph 索引
 ```
+
+### CodeGraph（代码图谱）
+
+本项目已集成 [CodeGraph](https://github.com/colbymchenry/codegraph) MCP，用于结构化代码探索。
+
+```bash
+# 全局安装 CLI（一次性）
+npm i -g @colbymchenry/codegraph
+
+# 项目内已配置 .cursor/mcp.json；新 clone 后初始化索引
+codegraph init
+
+# major 版本变更后重建索引（npm version major 会自动触发）
+npm run codegraph:sync
+```
+
+- **日常**：文件保存后 CodeGraph 自动 sync，无需手动操作
+- **重启 Cursor** 后 MCP 才会加载（修改 mcp.json 后必做）
+- **规则**：见 `.cursor/rules/codegraph.mdc` 与下方 CodeGraph 段
+
+<!-- codegraph:start -->
+探索代码结构时优先 `codegraph explore` / MCP `codegraph_explore`；读单文件用 `codegraph node` / `codegraph_node`。
+<!-- codegraph:end -->
 
 环境变量（`.env.local`，**勿提交**）：
 
@@ -148,6 +172,7 @@ PINECONE_API_KEY=
 | 规则文件 | 作用域 |
 |----------|--------|
 | `.cursor/rules/core.mdc` | 全局 |
+| `.cursor/rules/codegraph.mdc` | 全局（CodeGraph 使用 + 架构导航） |
 | `.cursor/rules/nextjs-app.mdc` | `app/**`, `components/**` |
 | `.cursor/rules/server-audit.mdc` | `server/**` |
 | `.cursor/rules/ai-layer.mdc` | `lib/ai-provider.ts`, `lib/pinecone.ts`, `server/rag.ts`, `server/langgraph.ts` |

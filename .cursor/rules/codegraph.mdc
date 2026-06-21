@@ -1,0 +1,51 @@
+---
+description: CodeGraph 代码图谱使用规范与 AuditLens 架构导航
+alwaysApply: true
+---
+
+# CodeGraph
+
+本项目已启用 CodeGraph（`.codegraph/`）。探索代码结构时优先使用 MCP 工具，避免重复 grep/Read 扫描。
+
+## 工具选择
+
+| 意图 | 工具 |
+|------|------|
+| 模块如何工作、调用链、影响范围 | `codegraph_explore` |
+| 定位符号 | `codegraph_search` |
+| 谁调用了某函数 | `codegraph_callers` |
+| 读单个符号或文件 | `codegraph_node` |
+
+信任图谱结果，编辑后注意 staleness 提示再决定是否 Read 文件。
+
+## AuditLens 入口（查架构时从这里开始）
+
+| 模块 | 路径 | 职责 |
+|------|------|------|
+| 审计 API | `app/api/audit/route.ts` | 上传触发、写 task |
+| Graph 编排 | `server/langgraph.ts` | 六节点流水线 |
+| 规则引擎 | `server/rules.ts` | 重复 invoice、审批缺失 |
+| 异常检测 | `server/anomaly.ts` | 金额异常、供应商集中 |
+| 评分 | `server/audit-engine.ts` | RiskScoring 公式 |
+| RAG | `server/rag.ts` | 检索 + 上下文 |
+| LLM 工厂 | `lib/ai-provider.ts` | 可插拔 Provider |
+| 向量库 | `lib/pinecone.ts` | VectorStore 封装 |
+| 领域类型 | `types/audit.ts` | Record, Issue, Task |
+| 路由保护 | `middleware.ts` | Auth 校验 |
+
+流水线顺序：`ParseExcel → RuleCheck → AnomalyDetection → RiskScoring → RAGExplain → ReportGeneration`
+
+## 边界（修改代码时必须遵守）
+
+```text
+app/ → server/ → lib/
+types/ ← 所有层（types 不 import 业务代码）
+```
+
+禁止：`server/` import `components/`；`lib/` import `server/`；client 直连 LLM/向量 SDK。
+
+## 维护
+
+- 日常编辑：CodeGraph 自动 sync，无需手动索引
+- 项目或 CodeGraph CLI **大版本**变更后：运行 `npm run codegraph:sync`
+- 详细架构见 `PROJECT.md`，任务进度见 `todo.md`
