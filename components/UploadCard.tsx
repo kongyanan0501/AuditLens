@@ -1,13 +1,27 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { FileSpreadsheet, Upload, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { FileSpreadsheet, Loader2, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { cn } from "@/lib/utils";
 
 const ACCEPT = ".xlsx,.xls,.csv";
 const ACCEPT_LABEL = "Excel / CSV";
+
+type AuditApiResponse = {
+  data?: {
+    taskId: string;
+    score: number | null;
+    issueCount: number;
+    recordCount: number;
+    status: string;
+  };
+  error?: string;
+  code?: string;
+  taskId?: string;
+};
 
 function formatFileSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -16,13 +30,17 @@ function formatFileSize(bytes: number) {
 }
 
 export function UploadCard() {
+  const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleFiles = useCallback((files: FileList | null) => {
     if (!files?.length) return;
     setFile(files[0]);
+    setError(null);
   }, []);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -46,8 +64,45 @@ export function UploadCard() {
 
   const clearFile = useCallback(() => {
     setFile(null);
+    setError(null);
     if (inputRef.current) inputRef.current.value = "";
   }, []);
+
+  const handleAnalyze = useCallback(async () => {
+    if (!file || isSubmitting) return;
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/audit", {
+        method: "POST",
+        body: formData,
+      });
+
+      const payload = (await response.json()) as AuditApiResponse;
+
+      if (!response.ok) {
+        setError(payload.error ?? "分析失败，请稍后重试");
+        return;
+      }
+
+      const taskId = payload.data?.taskId;
+      if (taskId) {
+        router.push(`/dashboard?taskId=${taskId}`);
+        return;
+      }
+
+      router.push("/dashboard");
+    } catch {
+      setError("网络错误，请检查连接后重试");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [file, isSubmitting, router]);
 
   return (
     <div className="space-y-4">
@@ -123,16 +178,30 @@ export function UploadCard() {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <Button
           type="button"
-          disabled={!file}
+          disabled={!file || isSubmitting}
           size="lg"
           className="shadow-[var(--shadow-glow)]"
+          onClick={() => void handleAnalyze()}
         >
-          开始分析
+          {isSubmitting ? (
+            <>
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+              分析中…
+            </>
+          ) : (
+            "开始分析"
+          )}
         </Button>
         <p className="text-xs text-muted-foreground">
-          审计 API 将在 Phase 6 接入，当前为 UI 预览
+          上传后将运行 LangGraph 审计流水线并写入任务结果
         </p>
       </div>
+
+      {error && (
+        <p className="text-sm text-destructive" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

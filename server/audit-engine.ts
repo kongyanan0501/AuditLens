@@ -1,5 +1,19 @@
-import type { AuditGraphState, AuditIssue, IssueType } from "@/types/audit";
+import { runAnomalyDetection } from "@/server/anomaly";
+import { runRuleCheck } from "@/server/rules";
+import type {
+  AuditAnomaly,
+  AuditGraphState,
+  AuditIssue,
+  AuditRecord,
+  IssueType,
+} from "@/types/audit";
 import { RISK_SCORE_WEIGHTS } from "@/types/audit";
+
+export type DeterministicAuditResult = {
+  issues: AuditIssue[];
+  anomalies: AuditAnomaly[];
+  score: number;
+};
 
 function countByType(issues: AuditIssue[], type: IssueType): number {
   return issues.filter((issue) => issue.type === type).length;
@@ -23,4 +37,15 @@ export function computeRiskScore(
     missingApproval * RISK_SCORE_WEIGHTS.missingApproval;
 
   return Math.max(0, Math.min(100, raw));
+}
+
+/** 确定性审计入口：规则 + 异常 + 评分，无需 LLM */
+export function runDeterministicAudit(
+  records: AuditRecord[],
+): DeterministicAuditResult {
+  const issues = runRuleCheck(records);
+  const anomalies = runAnomalyDetection(records);
+  const score = computeRiskScore({ issues, anomalies });
+
+  return { issues, anomalies, score };
 }

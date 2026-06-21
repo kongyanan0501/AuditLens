@@ -1,0 +1,8 @@
+date,type,amount,vendor,invoiceId,approvedBy
+2025-01-10,expense,100,VendorA,INV-001,Alice
+2025-01-11,expense,100,VendorA,INV-002,Alice
+2025-01-12,expense,100,VendorB,INV-001,Bob
+2025-01-13,expense,100,VendorA,INV-003,Alice
+2025-01-14,expense,100,VendorA,INV-004,Alice
+2025-01-15,expense,100,VendorA,INV-005,Alice
+2025-01-16,expense,100,VendorA,INV-006,

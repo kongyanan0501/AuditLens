@@ -99,6 +99,8 @@ export type AuditGraphState = {
   taskId?: string;
   userId?: string;
   fileName?: string;
+  /** Transient upload bytes for ParseExcel (not persisted) */
+  fileContent?: Uint8Array;
   records: AuditRecord[];
   issues: AuditIssue[];
   anomalies: AuditAnomaly[];

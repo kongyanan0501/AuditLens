@@ -9,10 +9,15 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "smoke:ai": "tsx --test lib/ai-smoke.test.ts",
+    "test:audit": "tsx --test server/audit-engine.test.ts",
+    "test:langgraph": "tsx --test server/langgraph.test.ts",
     "codegraph:sync": "node scripts/codegraph-sync.mjs",
+    "fixtures:xlsx": "node scripts/build-fixtures-xlsx.mjs",
     "postversion": "npm run codegraph:sync"
   },
   "dependencies": {
+    "@langchain/core": "^1.2.0",
+    "@langchain/langgraph": "^1.4.4",
     "@pinecone-database/pinecone": "^8.0.0",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.2",
@@ -24,7 +29,8 @@
     "radix-ui": "^1.6.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "tailwind-merge": "^3.3.0"
+    "tailwind-merge": "^3.3.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",

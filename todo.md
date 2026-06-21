@@ -70,10 +70,10 @@
 
 ## Phase 5 — 审计引擎（确定性）
 
-- [ ] `server/rules.ts` — 重复 invoiceId、审批缺失
-- [ ] `server/anomaly.ts` — 金额异常（> avg×5）、供应商集中
-- [ ] `server/audit-engine.ts` — RiskScoring 公式
-- [ ] 纯函数测试或脚本验证样例 Excel
+- [x] `server/rules.ts` — 重复 invoiceId、审批缺失
+- [x] `server/anomaly.ts` — 金额异常（> avg×5）、供应商集中
+- [x] `server/audit-engine.ts` — RiskScoring 公式
+- [x] 纯函数测试或脚本验证样例 Excel
 
 **完成标准**：给定 `Record[]` 可输出 issues、anomalies、score，无需 LLM。
 
@@ -81,11 +81,11 @@
 
 ## Phase 6 — LangGraph 编排
 
-- [ ] 安装 `@langchain/langgraph` 及相关依赖
-- [ ] `server/langgraph.ts` — 六节点 Graph + state 类型
-- [ ] ParseExcel 节点（xlsx/csv 解析 → `Record[]`）
-- [ ] 串联 RuleCheck → Anomaly → Scoring 节点
-- [ ] `app/api/audit/route.ts` — 接收上传、写 task、触发 graph
+- [x] 安装 `@langchain/langgraph` 及相关依赖
+- [x] `server/langgraph.ts` — 六节点 Graph + state 类型
+- [x] ParseExcel 节点（xlsx/csv 解析 → `Record[]`）
+- [x] 串联 RuleCheck → Anomaly → Scoring 节点
+- [x] `app/api/audit/route.ts` — 接收上传、写 task、触发 graph
 
 **完成标准**：API 上传样例文件后 task 状态变为 completed，issues 写入 DB。
 
@@ -144,10 +144,10 @@
 | 2 | 认证与路由保护 | `[x]` |
 | 3 | UI 骨架 | `[x]` |
 | 4 | AI 基础设施 | `[x]` |
-| 5 | 审计引擎 | `[ ]` |
-| 6 | LangGraph | `[ ]` |
+| 5 | 审计引擎 | `[x]` |
+| 6 | LangGraph | `[x]` |
 | 7 | RAG + LLM | `[ ]` |
 | 8 | 报告与 Dashboard | `[ ]` |
 | 9 | 打磨与交付 | `[ ]` |
 
-**最后更新**：2026-06-21 — Phase 4 可插拔 AI 基础设施完成
+**最后更新**：2026-06-21 — Phase 6 LangGraph 编排与审计 API 完成
