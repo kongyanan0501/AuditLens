@@ -22,7 +22,11 @@ alwaysApply: false
 ParseExcel → RuleCheck → AnomalyDetection → RiskScoring → RAGExplain → ReportGeneration
 ```
 
-修改节点顺序时同步更新 `types/audit.ts` 的 GraphState 与 `PROJECT.md`。
+修改节点顺序时同步更新 `types/audit.ts` 的 GraphState、`PROJECT.md` 与 `docs/business-decisions.md` §1。
+
+## 业务规则来源
+
+阈值、评分、RAG 行为等**以 [`docs/business-decisions.md`](../../docs/business-decisions.md) 为准**；修改 `rules.ts` / `anomaly.ts` / `audit-engine.ts` / `rag.ts` 时须同步更新该文档。
 
 ## 编码要求
 
@@ -32,7 +36,7 @@ ParseExcel → RuleCheck → AnomalyDetection → RiskScoring → RAGExplain →
 
 ## 评分公式（MVP）
 
-`score = 100 - duplicates*10 - anomalies*5 - missingApproval*8`
+详见 `docs/business-decisions.md` §5。摘要：`score = 100 - duplicates*10 - anomalies*5 - missingApproval*8`
 
 ## 禁止
 

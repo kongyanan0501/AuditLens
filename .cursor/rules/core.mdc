@@ -26,7 +26,19 @@ types/ ← 所有层（types 不 import 业务代码）
 1. 查 `todo.md` 当前 Phase
 2. 查 `PROJECT.md` 定位模块
 3. 涉及数据库：先读 `supabase/schema.md`
-4. 完成后跑 `npm run lint` 和 `npm run build`
+4. 涉及业务规则/阈值/评分/RAG：先读 `docs/business-decisions.md`
+5. 完成后跑 `npm run lint` 和 `npm run build`
+
+## 业务决策同步（强制）
+
+**[`docs/business-decisions.md`](docs/business-decisions.md)** 是业务规则、阈值、评分、RAG/LLM 行为、API 业务约束的 canonical 文档。
+
+每次变更业务决策（规则阈值、评分公式、解析语义、LLM 范围、持久化字段含义等），**同一提交**内必须：
+
+1. 更新 **`docs/business-decisions.md`** 对应章节
+2. 在文档 **变更日志** 追加一行
+
+详见 `.cursor/rules/business-decisions.mdc`。
 
 ## 数据库 Schema 同步（强制）
 

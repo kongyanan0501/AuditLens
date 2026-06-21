@@ -3,6 +3,8 @@
 
 # 📄 AuditLens AI — System Design (Final MVP Spec)
 
+> **已落地规则与阈值**以 [`business-decisions.md`](./business-decisions.md) 为准；本文档为产品/功能规格，变更实现细节时同步更新 business-decisions。
+
 ---
 
 # 🧭 1. 项目概述

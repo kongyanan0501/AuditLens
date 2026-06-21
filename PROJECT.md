@@ -77,7 +77,7 @@ type Record = {
 };
 ```
 
-评分公式（MVP）：`score = 100 - duplicates*10 - anomalies*5 - missingApproval*8`
+评分公式（MVP）：见 **[docs/business-decisions.md §5](./docs/business-decisions.md)**
 
 ## 数据模型（Supabase）
 
@@ -97,7 +97,7 @@ type Record = {
 1. **`middleware.ts`** — 鉴权遗漏会导致数据泄露
 2. **`server/langgraph.ts`** — 节点顺序与 state shape 影响全链路
 3. **`lib/ai-provider.ts`** — Provider 切换不得破坏 embed/chat 签名
-4. **`server/rag.ts`** — 检索上下文直接影响 LLM 解释质量
+4. **`server/rag.ts`** — 检索上下文直接影响 LLM 解释质量（规则见 business-decisions §6）
 5. **API Route 中的文件解析** — 注意文件大小、类型校验、路径遍历
 
 ## 模块依赖方向
@@ -118,6 +118,7 @@ types/ ← 所有层（无反向依赖）
 
 ## 相关文档
 
+- [docs/business-decisions.md](./docs/business-decisions.md) — **业务规则/阈值/评分 canonical（改规则必更）**
 - [docs/init.md](./docs/init.md) — MVP 产品规格
 - [todo.md](./todo.md) — 分阶段实施清单
 - [supabase/schema.md](./supabase/schema.md) — 数据库表结构（改库必更）

@@ -54,7 +54,10 @@ describe("runAuditGraph", () => {
     assert.ok(result.issues.length > 0);
     assert.ok(result.anomalies.length > 0);
     assert.ok(typeof result.score === "number");
-    assert.ok(result.report?.includes("审计报告"));
+    assert.match(result.report ?? "", /## 执行摘要/);
+    assert.match(result.report ?? "", /## 发现项/);
+    assert.match(result.report ?? "", /## 风险分析/);
+    assert.match(result.report ?? "", /## 整改建议/);
   });
 
   it("marks failed when file content is empty", async () => {

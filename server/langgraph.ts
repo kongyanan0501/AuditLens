@@ -2,6 +2,8 @@ import { Annotation, END, START, StateGraph } from "@langchain/langgraph";
 import { computeRiskScore } from "@/server/audit-engine";
 import { runAnomalyDetection } from "@/server/anomaly";
 import { parseFinancialFile, ParseExcelError } from "@/server/parse-excel";
+import { runRagExplain } from "@/server/rag";
+import { runReportGeneration } from "@/server/report";
 import { runRuleCheck } from "@/server/rules";
 import type {
   AuditAnomaly,
@@ -70,28 +72,15 @@ async function riskScoringNode(
   return { score: computeRiskScore(state) };
 }
 
-/** Phase 7 占位：暂不调用 LLM */
 async function ragExplainNode(state: GraphState): Promise<Partial<GraphState>> {
-  void state;
-  return { explanations: [] };
+  const { issues, anomalies, explanations } = await runRagExplain(state);
+  return { issues, anomalies, explanations };
 }
 
-/** Phase 8 占位：结构化 Markdown 报告 */
 async function reportGenerationNode(
   state: GraphState,
 ): Promise<Partial<GraphState>> {
-  const issueCount = state.issues.length + state.anomalies.length;
-  const report = [
-    "# 审计报告（Phase 6 占位）",
-    "",
-    `- 文件名：${state.fileName ?? "—"}`,
-    `- 记录数：${state.records.length}`,
-    `- 风险评分：**${state.score ?? "—"}**`,
-    `- 发现问题：**${issueCount}** 项`,
-    "",
-    "完整 LLM 报告将在 Phase 7/8 生成。",
-  ].join("\n");
-
+  const report = await runReportGeneration(state);
   return { report, status: "completed" };
 }
 

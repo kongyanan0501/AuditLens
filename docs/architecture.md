@@ -1,7 +1,7 @@
 # AuditLens AI — 项目架构文档
 
 > 本文档描述系统架构与 **Cursor Agent Harness** 设计，使 AI 能精准定位模块、遵守边界、按序实施。  
-> 操作指令：[AGENT.md](../AGENT.md) · 架构地图：[PROJECT.md](../PROJECT.md) · 任务：[todo.md](../todo.md) · 规格：[init.md](./init.md)
+> 操作指令：[AGENT.md](../AGENT.md) · 架构地图：[PROJECT.md](../PROJECT.md) · 任务：[todo.md](../todo.md) · 规格：[init.md](./init.md) · **业务决策：[business-decisions.md](./business-decisions.md)**
 
 ---
 
@@ -107,11 +107,13 @@ AuditLens/
 │
 ├── docs/
 │   ├── init.md              # MVP 产品规格
+│   ├── business-decisions.md # 业务规则/阈值 canonical（改规则必更）
 │   └── architecture.md      # 本文档
 │
 └── .cursor/
     └── rules/               # Cursor 分域规则
         ├── core.mdc
+        ├── business-decisions.mdc
         ├── nextjs-app.mdc
         ├── server-audit.mdc
         └── ai-layer.mdc
@@ -173,12 +175,17 @@ State 在节点间不可变扩展，类型定义在 `types/audit.ts`。
 
 ### 5.5 风险规则（MVP）
 
-1. **重复检测**：`invoiceId` 重复
-2. **金额异常**：`amount > avg * 5`
-3. **供应商集中**：单一 vendor 占比过高
-4. **审批缺失**：`approvedBy` 为空
+> **Canonical 细节**：[`business-decisions.md`](./business-decisions.md) §3–§6（阈值、严重程度、评分、RAG 范围）。
 
-评分：`score = 100 - duplicates*10 - anomalies*5 - missingApproval*8`
+摘要：
+
+1. **重复检测**：`invoiceId` 重复 → high  
+2. **金额异常**：`amount > avg × 5`  
+3. **供应商集中**：单一 vendor 支出占比 > 50%  
+4. **审批缺失**：expense 且 `approvedBy` 为空 → medium  
+5. **RAG 解释**：仅 `severity === high` 的 issue/anomaly  
+
+评分：`score = 100 - duplicates×10 - anomalies×5 - missingApproval×8`（clamp 0–100）
 
 ---
 

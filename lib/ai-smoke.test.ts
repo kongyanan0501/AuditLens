@@ -15,6 +15,7 @@ import {
 const ENV_KEYS = [
   "AI_PROVIDER",
   "OPENAI_API_KEY",
+  "DASHSCOPE_API_KEY",
   "PINECONE_API_KEY",
 ] as const;
 
@@ -88,6 +89,39 @@ describe("AI provider factory", () => {
         return true;
       },
     );
+  });
+
+  it("throws AIProviderError when DASHSCOPE_API_KEY is missing for qwen", () => {
+    setEnv("AI_PROVIDER", "qwen");
+    setEnv("DASHSCOPE_API_KEY", undefined);
+
+    assert.throws(
+      () => createLLMProvider("qwen"),
+      (error: unknown) => {
+        assert.ok(error instanceof AIProviderError);
+        assert.equal(error.code, "AI_MISSING_API_KEY");
+        assert.match(error.message, /DASHSCOPE_API_KEY/);
+        return true;
+      },
+    );
+  });
+
+  it("creates qwen provider when DASHSCOPE_API_KEY is set", () => {
+    setEnv("AI_PROVIDER", "qwen");
+    setEnv("DASHSCOPE_API_KEY", "test-dashscope-key");
+
+    const provider = createLLMProvider("qwen");
+    assert.equal(typeof provider.chat, "function");
+    assert.equal(typeof provider.embed, "function");
+  });
+
+  it("auto-selects qwen when only DASHSCOPE_API_KEY is set", () => {
+    setEnv("AI_PROVIDER", undefined);
+    setEnv("OPENAI_API_KEY", undefined);
+    setEnv("DASHSCOPE_API_KEY", "test-dashscope-key");
+
+    const provider = createLLMProvider();
+    assert.equal(typeof provider.chat, "function");
   });
 });
 

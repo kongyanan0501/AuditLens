@@ -85,7 +85,25 @@ order by tablename;
 
 ## 7. 可选：种子知识库
 
-通过 **service_role** 在服务端插入（Phase 7 将提供脚本）。示例：
+通过 **service_role** 在服务端插入（Phase 7 脚本）。配置好 env 后运行：
+
+```bash
+npm run seed:kb
+```
+
+脚本会将 5 条审计政策片段写入 **Pinecone** 与 **`knowledge_base`** 表。
+
+### 常见错误
+
+| 报错 | 原因 | 处理 |
+|------|------|------|
+| `403 Country, region, or territory not supported` | OpenAI 在当前地区不可用 | 配置 `OPENAI_BASE_URL`，或改用 `AI_PROVIDER=qwen` + `DASHSCOPE_API_KEY` |
+| `Connection error` | 无法连上 embedding 服务 | OpenAI：检查代理与 Key；Qwen：检查 `DASHSCOPE_API_KEY` 与 `DASHSCOPE_BASE_URL` |
+| 维度不匹配 | Pinecone index 不是 1536 维 | 重建 **Dense 1536** index，名称 `auditlens`；Qwen v3/v4 须设 `QWEN_EMBED_DIMENSIONS=1536` |
+
+Pinecone 控制台示例里的 `quickstart` 只是演示名；本项目 index 名应为 **`auditlens`**（与 `PINECONE_INDEX` 一致）。
+
+也可手动 SQL：
 
 ```sql
 insert into public.knowledge_base (content, category)

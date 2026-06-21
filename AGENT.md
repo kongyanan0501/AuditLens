@@ -16,7 +16,8 @@ AuditLens AI 是面向审计/税务场景的智能风险分析系统：上传财
 
 1. 读 [PROJECT.md](./PROJECT.md) 确认模块边界与数据流
 2. 查 [todo.md](./todo.md) 确认当前阶段与依赖
-3. 只改与任务相关的文件，禁止无关重构
+3. 改业务规则/阈值/评分/RAG 前读 [docs/business-decisions.md](./docs/business-decisions.md)
+4. 只改与任务相关的文件，禁止无关重构
 4. 遵循 `.cursor/rules/` 中对应 glob 的规则
 5. 类型定义优先放 `types/`，跨层共享通过 `types/audit.ts`
 6. 涉及数据库：先读 [`supabase/schema.md`](./supabase/schema.md)；改表后同步该文件（见下方「数据库 Schema」）
@@ -134,8 +135,9 @@ npm run codegraph:sync
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
-AI_PROVIDER=openai          # openai | deepseek | claude
-OPENAI_API_KEY=
+AI_PROVIDER=openai          # openai | qwen | deepseek
+OPENAI_API_KEY=             # AI_PROVIDER=openai
+DASHSCOPE_API_KEY=          # AI_PROVIDER=qwen（阿里云百炼，无需 OpenAI）
 PINECONE_API_KEY=
 ```
 
@@ -170,6 +172,7 @@ PINECONE_API_KEY=
 - [ ] 新 env 变量已写入 `.env.example`
 - [ ] 跨层 import 方向正确（`server/` ↛ `components/`）
 - [ ] 若变更数据库：`supabase/schema.md` 与 `types/database.ts` 已同步
+- [ ] 若变更业务决策：`docs/business-decisions.md` 已同步（含变更日志）
 
 ---
 
@@ -198,6 +201,7 @@ PINECONE_API_KEY=
 | `.cursor/rules/codegraph.mdc` | 全局（CodeGraph 使用 + 架构导航） |
 | `.cursor/rules/nextjs-app.mdc` | `app/**`, `components/**` |
 | `.cursor/rules/server-audit.mdc` | `server/**` |
+| `.cursor/rules/business-decisions.mdc` | `server/**`, `types/audit.ts`, `app/api/**` |
 | `.cursor/rules/database.mdc` | `supabase/**`, `types/database.ts` |
 | `.cursor/rules/ai-layer.mdc` | `lib/ai-provider.ts`, `lib/pinecone.ts`, `server/rag.ts`, `server/langgraph.ts` |
 
@@ -209,8 +213,8 @@ PINECONE_API_KEY=
 |------|------|--------|
 | 登录/鉴权 | init.md §4 | `app/login`, `middleware.ts`, `hooks/useAuth.ts` |
 | 上传解析 | init.md §8.1-8.2 | `app/upload`, `server/langgraph.ts` ParseExcel 节点 |
-| 风险规则 | init.md §8.3 | `server/rules.ts`, `server/anomaly.ts` |
-| RAG 解释 | init.md §6 | `server/rag.ts`, `lib/pinecone.ts` |
+| 风险规则 | [business-decisions.md §3–§4](./docs/business-decisions.md), init.md §8.3 | `server/rules.ts`, `server/anomaly.ts` |
+| RAG 解释 | [business-decisions.md §6](./docs/business-decisions.md), init.md §6 | `server/rag.ts`, `lib/pinecone.ts` |
 | 报告生成 | init.md §8.6 | LangGraph ReportGeneration 节点, `components/ReportViewer.tsx` |
 | 数据模型 | [supabase/schema.md](./supabase/schema.md), init.md §9 | migration / `types/database.ts` / `types/audit.ts` |
 
@@ -222,6 +226,7 @@ PINECONE_API_KEY=
 AGENT.md          ← 你正在读：操作指令、边界、命令
 PROJECT.md        ← 架构地图：入口、模块、风险区
 todo.md           ← 实施任务与进度
+docs/business-decisions.md ← 业务规则/阈值/评分 canonical（改规则必更）
 supabase/schema.md ← 数据库表结构 canonical（改库必更）
 docs/init.md      ← MVP 功能规格（产品需求）
 docs/architecture.md ← 完整架构与 harness 说明

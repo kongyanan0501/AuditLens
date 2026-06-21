@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 
-export type AIProviderName = "openai" | "deepseek";
+export type AIProviderName = "openai" | "deepseek" | "qwen";
 
 export interface LLMProvider {
   chat(input: string): Promise<string>;
@@ -22,22 +22,70 @@ const OPENAI_CHAT_MODEL =
 const OPENAI_EMBED_MODEL =
   process.env.OPENAI_EMBED_MODEL?.trim() || "text-embedding-3-small";
 
-class OpenAIProvider implements LLMProvider {
-  private readonly client: OpenAI;
+const QWEN_CHAT_MODEL = process.env.QWEN_CHAT_MODEL?.trim() || "qwen-plus";
+const QWEN_EMBED_MODEL =
+  process.env.QWEN_EMBED_MODEL?.trim() || "text-embedding-v2";
+const DASHSCOPE_BASE_URL =
+  process.env.DASHSCOPE_BASE_URL?.trim() ||
+  "https://dashscope.aliyuncs.com/compatible-mode/v1";
 
-  constructor(apiKey: string) {
-    this.client = new OpenAI({ apiKey });
+/** Pinecone / Supabase knowledge_base 当前固定 1536 维 */
+export const EXPECTED_EMBED_DIMENSIONS = 1536;
+
+function parseOptionalInt(raw: string | undefined): number | undefined {
+  if (!raw?.trim()) {
+    return undefined;
+  }
+  const value = Number.parseInt(raw.trim(), 10);
+  return Number.isFinite(value) ? value : undefined;
+}
+
+function embedDimensionsForModel(
+  model: string,
+  envKey: string,
+  fallback?: number,
+): number | undefined {
+  const explicit = parseOptionalInt(process.env[envKey]);
+  if (explicit !== undefined) {
+    return explicit;
+  }
+  if (model.includes("v4") || model.includes("v3")) {
+    return fallback ?? EXPECTED_EMBED_DIMENSIONS;
+  }
+  return undefined;
+}
+
+class OpenAICompatibleProvider implements LLMProvider {
+  private readonly client: OpenAI;
+  private readonly chatModel: string;
+  private readonly embedModel: string;
+  private readonly embedDimensions?: number;
+
+  constructor(options: {
+    apiKey: string;
+    baseURL?: string;
+    chatModel: string;
+    embedModel: string;
+    embedDimensions?: number;
+  }) {
+    this.client = new OpenAI({
+      apiKey: options.apiKey,
+      ...(options.baseURL ? { baseURL: options.baseURL } : {}),
+    });
+    this.chatModel = options.chatModel;
+    this.embedModel = options.embedModel;
+    this.embedDimensions = options.embedDimensions;
   }
 
   async chat(input: string): Promise<string> {
     const response = await this.client.chat.completions.create({
-      model: OPENAI_CHAT_MODEL,
+      model: this.chatModel,
       messages: [{ role: "user", content: input }],
     });
 
     const content = response.choices[0]?.message?.content;
     if (!content) {
-      throw new AIProviderError("OpenAI chat returned empty content", "AI_CHAT_EMPTY");
+      throw new AIProviderError("Chat returned empty content", "AI_CHAT_EMPTY");
     }
 
     return content;
@@ -45,13 +93,16 @@ class OpenAIProvider implements LLMProvider {
 
   async embed(input: string): Promise<number[]> {
     const response = await this.client.embeddings.create({
-      model: OPENAI_EMBED_MODEL,
+      model: this.embedModel,
       input,
+      ...(this.embedDimensions !== undefined
+        ? { dimensions: this.embedDimensions }
+        : {}),
     });
 
     const embedding = response.data[0]?.embedding;
     if (!embedding?.length) {
-      throw new AIProviderError("OpenAI embed returned empty vector", "AI_EMBED_EMPTY");
+      throw new AIProviderError("Embed returned empty vector", "AI_EMBED_EMPTY");
     }
 
     return embedding;
@@ -62,30 +113,55 @@ class OpenAIProvider implements LLMProvider {
 class DeepSeekProvider implements LLMProvider {
   async chat(): Promise<string> {
     throw new AIProviderError(
-      "DeepSeekProvider is not implemented yet. Set AI_PROVIDER=openai.",
+      "DeepSeekProvider is not implemented yet. Set AI_PROVIDER=openai or qwen.",
       "AI_PROVIDER_NOT_IMPLEMENTED",
     );
   }
 
   async embed(): Promise<number[]> {
     throw new AIProviderError(
-      "DeepSeekProvider is not implemented yet. Set AI_PROVIDER=openai.",
+      "DeepSeekProvider is not implemented yet. Set AI_PROVIDER=openai or qwen.",
       "AI_PROVIDER_NOT_IMPLEMENTED",
     );
   }
 }
 
-function resolveProviderName(): AIProviderName {
-  const raw = process.env.AI_PROVIDER?.trim().toLowerCase() || "openai";
-
-  if (raw === "openai" || raw === "deepseek") {
+export function resolveProviderName(): AIProviderName {
+  const raw = process.env.AI_PROVIDER?.trim().toLowerCase();
+  if (raw === "openai" || raw === "deepseek" || raw === "qwen") {
     return raw;
   }
+  if (raw) {
+    throw new AIProviderError(
+      `Unknown AI_PROVIDER "${raw}". Expected "openai", "deepseek", or "qwen".`,
+      "AI_PROVIDER_UNKNOWN",
+    );
+  }
+  // 未显式设置时：仅有 DashScope Key 则默认 qwen
+  if (
+    process.env.DASHSCOPE_API_KEY?.trim() &&
+    !process.env.OPENAI_API_KEY?.trim()
+  ) {
+    return "qwen";
+  }
+  return "openai";
+}
 
-  throw new AIProviderError(
-    `Unknown AI_PROVIDER "${raw}". Expected "openai" or "deepseek".`,
-    "AI_PROVIDER_UNKNOWN",
-  );
+export function hasLlmApiKey(
+  providerName: AIProviderName = resolveProviderName(),
+): boolean {
+  switch (providerName) {
+    case "openai":
+      return Boolean(process.env.OPENAI_API_KEY?.trim());
+    case "qwen":
+      return Boolean(process.env.DASHSCOPE_API_KEY?.trim());
+    case "deepseek":
+      return Boolean(process.env.DEEPSEEK_API_KEY?.trim());
+    default: {
+      const exhaustive: never = providerName;
+      return Boolean(exhaustive);
+    }
+  }
 }
 
 export function createLLMProvider(
@@ -100,7 +176,32 @@ export function createLLMProvider(
           "AI_MISSING_API_KEY",
         );
       }
-      return new OpenAIProvider(apiKey);
+      return new OpenAICompatibleProvider({
+        apiKey,
+        baseURL: process.env.OPENAI_BASE_URL?.trim(),
+        chatModel: OPENAI_CHAT_MODEL,
+        embedModel: OPENAI_EMBED_MODEL,
+      });
+    }
+    case "qwen": {
+      const apiKey = process.env.DASHSCOPE_API_KEY?.trim();
+      if (!apiKey) {
+        throw new AIProviderError(
+          "DASHSCOPE_API_KEY is required when AI_PROVIDER=qwen.",
+          "AI_MISSING_API_KEY",
+        );
+      }
+      const embedModel = QWEN_EMBED_MODEL;
+      return new OpenAICompatibleProvider({
+        apiKey,
+        baseURL: DASHSCOPE_BASE_URL,
+        chatModel: QWEN_CHAT_MODEL,
+        embedModel,
+        embedDimensions: embedDimensionsForModel(
+          embedModel,
+          "QWEN_EMBED_DIMENSIONS",
+        ),
+      });
     }
     case "deepseek":
       return new DeepSeekProvider();

@@ -24,11 +24,12 @@ npm run dev                    # http://localhost:3000
 - [AGENT.md](./AGENT.md) — AI 操作指令
 - [PROJECT.md](./PROJECT.md) — 架构地图
 - [todo.md](./todo.md) — 实施进度
+- [docs/business-decisions.md](./docs/business-decisions.md) — **业务规则/阈值/评分（改规则必更）**
 - [docs/architecture.md](./docs/architecture.md) — 完整架构
 - [docs/init.md](./docs/init.md) — MVP 规格
 
 ## 当前进度
 
-Phase 1 类型与 Supabase 数据模型已完成。下一步：Phase 2 认证与路由保护。
+Phase 7 RAG + LLM 解释已完成。下一步：Phase 8 报告与 Dashboard 联调。
 
 配置 Supabase：见 [docs/supabase-setup.md](./docs/supabase-setup.md)

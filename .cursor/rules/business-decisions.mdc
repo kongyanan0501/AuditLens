@@ -1,0 +1,34 @@
+---
+description: 业务决策文档同步 — 改规则/阈值/评分/RAG 行为时必须更新 docs/business-decisions.md
+globs: server/**,types/audit.ts,app/api/**,scripts/seed-knowledge-base.ts
+alwaysApply: false
+---
+
+# Business Decisions Sync
+
+## Canonical 文档
+
+**[`docs/business-decisions.md`](../../docs/business-decisions.md)** 是业务规则、阈值、评分、RAG/LLM 行为、API 业务约束的唯一记录源。
+
+## 触发场景
+
+改动以下任一内容时，**同一提交**内必须更新 `docs/business-decisions.md` 对应章节，并在 **变更日志** 追加一行：
+
+- `server/rules.ts` / `server/anomaly.ts` — 阈值、严重程度、触发条件
+- `server/audit-engine.ts` / `types/audit.ts` — 评分公式、`RISK_SCORE_WEIGHTS`
+- `server/parse-excel.ts` — 列映射、必填字段、归一化规则
+- `server/rag.ts` / `server/langgraph.ts` — LLM 范围、topK、prompt 输出、降级
+- `app/api/audit/route.ts` — 文件类型/大小、任务状态语义
+- `server/audit-repository.ts` — issue/report 持久化字段语义
+- `scripts/seed-knowledge-base.ts` / `KNOWLEDGE_SEED_ENTRIES` — 知识库条目
+
+## 禁止
+
+- 只改代码不更新 `docs/business-decisions.md`
+- 在 `.cursor/rules/` 或注释中重复定义阈值（应引用文档章节）
+- 与文档冲突的静默行为变更
+
+## 修改前
+
+1. 读 `docs/business-decisions.md` 相关章节
+2. 若 intentionally 变更决策：改代码 + 改文档 + 变更日志

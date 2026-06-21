@@ -93,10 +93,10 @@
 
 ## Phase 7 — RAG + LLM 解释
 
-- [ ] `server/rag.ts` — embed query → Pinecone search → context 组装
-- [ ] RAGExplain 节点 — risk + data + rule → LLM 解释
-- [ ] 知识库种子数据（审计政策片段）upsert 脚本或 API
-- [ ] issues 附带 `reason` 与建议字段
+- [x] `server/rag.ts` — embed query → Pinecone search → context 组装
+- [x] RAGExplain 节点 — risk + data + rule → LLM 解释
+- [x] 知识库种子数据（审计政策片段）upsert 脚本或 API
+- [x] issues 附带 `reason` 与建议字段
 
 **完成标准**：高风险 issue 有 LLM 生成的中文解释，引用检索到的政策上下文。
 
@@ -104,10 +104,10 @@
 
 ## Phase 8 — 报告与 Dashboard 联调
 
-- [ ] ReportGeneration 节点 — Executive Summary / Findings / Recommendations
-- [ ] 写入 `audit_reports`；`app/report/[id]/page.tsx` 展示
-- [ ] Dashboard 拉取 tasks、score、issues 列表与图表
-- [ ] Upload 页分析按钮全链路打通
+- [x] ReportGeneration 节点 — Executive Summary / Findings / Recommendations
+- [x] 写入 `audit_reports`；`app/report/[id]/page.tsx` 展示
+- [x] Dashboard 拉取 tasks、score、issues 列表与图表
+- [x] Upload 页分析按钮全链路打通
 
 **完成标准**：Demo 路径「上传 Excel → 秒出风险 → 查看报告」可完整演示。
 
@@ -129,9 +129,10 @@
 
 1. **一次只做一个 Phase 或其中一个子项**，避免跨 Phase 大范围改动
 2. 开工前声明：`当前 Phase X · 子项 Y`
-3. 完成后：勾选 todo、若架构有变则同步 `PROJECT.md` / `docs/architecture.md`
+3. 完成后：勾选 todo、若架构有变则同步 `PROJECT.md` / `docs/architecture.md`；若业务决策有变则同步 `docs/business-decisions.md`（含变更日志）
 4. 遇到阻塞：在对应子项下追加 `> 阻塞：原因`，不要静默跳过
 5. 不要提前实现后续 Phase 的功能（除非当前 Phase 明确依赖）
+6. **变更业务规则/阈值/评分/RAG 行为**：同一提交内更新 `docs/business-decisions.md`
 
 ---
 
@@ -146,8 +147,8 @@
 | 4 | AI 基础设施 | `[x]` |
 | 5 | 审计引擎 | `[x]` |
 | 6 | LangGraph | `[x]` |
-| 7 | RAG + LLM | `[ ]` |
-| 8 | 报告与 Dashboard | `[ ]` |
+| 7 | RAG + LLM | `[x]` |
+| 8 | 报告与 Dashboard | `[x]` |
 | 9 | 打磨与交付 | `[ ]` |
 
-**最后更新**：2026-06-21 — Phase 6 LangGraph 编排与审计 API 完成
+**最后更新**：2026-06-21 — Phase 8 报告生成、Dashboard 联调与 Upload 全链路完成

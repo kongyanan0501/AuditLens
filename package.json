@@ -11,6 +11,9 @@
     "smoke:ai": "tsx --test lib/ai-smoke.test.ts",
     "test:audit": "tsx --test server/audit-engine.test.ts",
     "test:langgraph": "tsx --test server/langgraph.test.ts",
+    "test:report": "tsx --test server/report.test.ts",
+    "test:rag": "tsx --test server/rag.test.ts",
+    "seed:kb": "tsx scripts/seed-knowledge-base.ts",
     "codegraph:sync": "node scripts/codegraph-sync.mjs",
     "fixtures:xlsx": "node scripts/build-fixtures-xlsx.mjs",
     "postversion": "npm run codegraph:sync"

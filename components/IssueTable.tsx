@@ -55,11 +55,22 @@ export function IssueTable({ issues }: IssueTableProps) {
               <tr>
                 <th className="px-5 py-3 font-medium">类型</th>
                 <th className="px-5 py-3 font-medium">严重程度</th>
-                <th className="px-5 py-3 font-medium">说明</th>
+                <th className="px-5 py-3 font-medium">说明与建议</th>
               </tr>
             </thead>
             <tbody>
-              {issues.map((issue, index) => (
+              {issues.map((issue, index) => {
+                const llmExplained = issue.metadata?.llmExplained === true;
+                const recommendation =
+                  typeof issue.metadata?.recommendation === "string"
+                    ? issue.metadata.recommendation
+                    : undefined;
+                const ruleReference =
+                  typeof issue.metadata?.ruleReference === "string"
+                    ? issue.metadata.ruleReference
+                    : undefined;
+
+                return (
                 <tr
                   key={issue.id ?? `${issue.type}-${index}`}
                   className="border-b border-[var(--border-subtle)] transition-colors last:border-0 hover:bg-muted/30"
@@ -78,10 +89,34 @@ export function IssueTable({ issues }: IssueTableProps) {
                     </span>
                   </td>
                   <td className="px-5 py-3.5 text-muted-foreground">
-                    {issue.reason}
+                    <div className="space-y-2">
+                      {llmExplained ? (
+                        <span className="inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                          AI 解释
+                        </span>
+                      ) : null}
+                      <p className="text-foreground">{issue.reason}</p>
+                      {ruleReference ? (
+                        <p className="text-xs">
+                          <span className="font-medium text-foreground">
+                            政策依据：
+                          </span>
+                          {ruleReference}
+                        </p>
+                      ) : null}
+                      {recommendation ? (
+                        <p className="text-xs">
+                          <span className="font-medium text-foreground">
+                            整改建议：
+                          </span>
+                          {recommendation}
+                        </p>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
           </table>
         </div>

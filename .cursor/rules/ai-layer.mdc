@@ -32,6 +32,8 @@ interface VectorStore {
 risk context → embed → Pinecone query (topK=5) → 拼接 policy context → LLM chat
 ```
 
+业务细节（解释范围、topK、降级、metadata 写回）：**[`docs/business-decisions.md`](../../docs/business-decisions.md) §6**。修改 `server/rag.ts` 时须同步该文档。
+
 ## LangGraph 集成
 
 - RAGExplain 节点调用 `server/rag.ts`，不内联 prompt 超过 50 行
