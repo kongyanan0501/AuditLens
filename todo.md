@@ -8,12 +8,12 @@
 
 ## Phase 0 — Harness & 脚手架
 
-- [ ] 初始化 Next.js 15 (App Router, TypeScript, Tailwind, ESLint)
-- [ ] 安装 shadcn/ui 并配置主题色（primary `#1E3A8A`）
-- [ ] 创建目标目录：`app/`, `components/`, `lib/`, `server/`, `types/`, `hooks/`
-- [ ] 添加 `.env.example`（Supabase、AI、Pinecone 变量）
-- [ ] 配置 `npm run typecheck`（`tsc --noEmit`）
-- [ ] 验证：`npm run dev` / `npm run build` / `npm run lint`
+- [x] 初始化 Next.js 15 (App Router, TypeScript, Tailwind, ESLint)
+- [x] 安装 shadcn/ui 并配置主题色（primary `#1E3A8A`）
+- [x] 创建目标目录：`app/`, `components/`, `lib/`, `server/`, `types/`, `hooks/`
+- [x] 添加 `.env.example`（Supabase、AI、Pinecone 变量）
+- [x] 配置 `npm run typecheck`（`tsc --noEmit`）
+- [x] 验证：`npm run dev` / `npm run build` / `npm run lint`
 
 **完成标准**：空壳应用可启动，目录结构与 [AGENT.md](./AGENT.md) 一致。
 
@@ -139,7 +139,7 @@
 
 | Phase | 名称 | 状态 |
 |-------|------|------|
-| 0 | Harness & 脚手架 | `[ ]` |
+| 0 | Harness & 脚手架 | `[x]` |
 | 1 | 类型与数据模型 | `[ ]` |
 | 2 | 认证与路由保护 | `[ ]` |
 | 3 | UI 骨架 | `[ ]` |
