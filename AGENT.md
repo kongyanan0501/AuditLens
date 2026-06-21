@@ -19,6 +19,7 @@ AuditLens AI 是面向审计/税务场景的智能风险分析系统：上传财
 3. 只改与任务相关的文件，禁止无关重构
 4. 遵循 `.cursor/rules/` 中对应 glob 的规则
 5. 类型定义优先放 `types/`，跨层共享通过 `types/audit.ts`
+6. 涉及数据库：先读 [`supabase/schema.md`](./supabase/schema.md)；改表后同步该文件（见下方「数据库 Schema」）
 
 ---
 
@@ -48,6 +49,10 @@ server/               # 服务端专用（禁止 client import）
 types/                # 共享 TypeScript 类型
 hooks/                # React hooks（如 useAuth）
 middleware.ts         # 路由保护
+
+supabase/             # 数据库
+  schema.md           # 表结构 canonical 文档（改库必更）
+  migrations/         # SQL 迁移
 ```
 
 ### 模块归属
@@ -164,6 +169,24 @@ PINECONE_API_KEY=
 - [ ] 改动范围与 todo 项一致
 - [ ] 新 env 变量已写入 `.env.example`
 - [ ] 跨层 import 方向正确（`server/` ↛ `components/`）
+- [ ] 若变更数据库：`supabase/schema.md` 与 `types/database.ts` 已同步
+
+---
+
+## 数据库 Schema
+
+**Canonical 文档**：[`supabase/schema.md`](./supabase/schema.md) — 所有表、列、RLS、索引、关系的唯一记录。
+
+每次更新数据库后必须同步：
+
+| 文件 | 说明 |
+|------|------|
+| `supabase/migrations/*.sql` | 可复现迁移 |
+| **`supabase/schema.md`** | 结构文档 + 变更日志 |
+| `types/database.ts` | Supabase 类型 |
+| `types/audit.ts` | 领域类型（列语义变化时） |
+
+规则详情：`.cursor/rules/database.mdc`
 
 ---
 
@@ -175,6 +198,7 @@ PINECONE_API_KEY=
 | `.cursor/rules/codegraph.mdc` | 全局（CodeGraph 使用 + 架构导航） |
 | `.cursor/rules/nextjs-app.mdc` | `app/**`, `components/**` |
 | `.cursor/rules/server-audit.mdc` | `server/**` |
+| `.cursor/rules/database.mdc` | `supabase/**`, `types/database.ts` |
 | `.cursor/rules/ai-layer.mdc` | `lib/ai-provider.ts`, `lib/pinecone.ts`, `server/rag.ts`, `server/langgraph.ts` |
 
 ---
@@ -188,7 +212,7 @@ PINECONE_API_KEY=
 | 风险规则 | init.md §8.3 | `server/rules.ts`, `server/anomaly.ts` |
 | RAG 解释 | init.md §6 | `server/rag.ts`, `lib/pinecone.ts` |
 | 报告生成 | init.md §8.6 | LangGraph ReportGeneration 节点, `components/ReportViewer.tsx` |
-| 数据模型 | init.md §9 | Supabase migration / `types/audit.ts` |
+| 数据模型 | [supabase/schema.md](./supabase/schema.md), init.md §9 | migration / `types/database.ts` / `types/audit.ts` |
 
 ---
 
@@ -198,6 +222,7 @@ PINECONE_API_KEY=
 AGENT.md          ← 你正在读：操作指令、边界、命令
 PROJECT.md        ← 架构地图：入口、模块、风险区
 todo.md           ← 实施任务与进度
+supabase/schema.md ← 数据库表结构 canonical（改库必更）
 docs/init.md      ← MVP 功能规格（产品需求）
 docs/architecture.md ← 完整架构与 harness 说明
 ```

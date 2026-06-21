@@ -1,12 +1,13 @@
-type IssueRow = {
-  id: string;
-  type: string;
-  severity: string;
-  reason: string;
-};
+import type { AuditIssue } from "@/types/audit";
 
 type IssueTableProps = {
-  issues: IssueRow[];
+  issues: AuditIssue[];
+};
+
+const severityLabels: Record<AuditIssue["severity"], string> = {
+  low: "低",
+  medium: "中",
+  high: "高",
 };
 
 export function IssueTable({ issues }: IssueTableProps) {
@@ -29,10 +30,15 @@ export function IssueTable({ issues }: IssueTableProps) {
             </tr>
           </thead>
           <tbody>
-            {issues.map((issue) => (
-              <tr key={issue.id} className="border-b last:border-0">
+            {issues.map((issue, index) => (
+              <tr
+                key={issue.id ?? `${issue.type}-${index}`}
+                className="border-b last:border-0"
+              >
                 <td className="px-4 py-3">{issue.type}</td>
-                <td className="px-4 py-3">{issue.severity}</td>
+                <td className="px-4 py-3">
+                  {severityLabels[issue.severity]}
+                </td>
                 <td className="px-4 py-3">{issue.reason}</td>
               </tr>
             ))}

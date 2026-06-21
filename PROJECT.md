@@ -81,6 +81,8 @@ type Record = {
 
 ## 数据模型（Supabase）
 
+> 完整列定义、RLS、索引：**[`supabase/schema.md`](./supabase/schema.md)**
+
 | 表 | 关键字段 | 归属 |
 |----|----------|------|
 | `audit_tasks` | user_id, file_name, status, score | 任务生命周期 |
@@ -118,4 +120,5 @@ types/ ← 所有层（无反向依赖）
 
 - [docs/init.md](./docs/init.md) — MVP 产品规格
 - [todo.md](./todo.md) — 分阶段实施清单
+- [supabase/schema.md](./supabase/schema.md) — 数据库表结构（改库必更）
 - [docs/architecture.md](./docs/architecture.md) — Harness 架构与模块详解

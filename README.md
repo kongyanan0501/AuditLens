@@ -29,4 +29,6 @@ npm run dev                    # http://localhost:3000
 
 ## 当前进度
 
-Phase 0 脚手架已完成。下一步：Phase 1 类型与 Supabase 数据模型。
+Phase 1 类型与 Supabase 数据模型已完成。下一步：Phase 2 认证与路由保护。
+
+配置 Supabase：见 [docs/supabase-setup.md](./docs/supabase-setup.md)

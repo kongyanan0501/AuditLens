@@ -1,0 +1,107 @@
+# Supabase 配置指南（Phase 1）
+
+本文档说明如何创建 Supabase 项目、启用 Auth、执行数据库迁移。
+
+## 1. 创建项目
+
+1. 打开 [Supabase Dashboard](https://supabase.com/dashboard)
+2. **New Project** → 选择组织、填写名称（如 `auditlens`）、设置数据库密码
+3. 等待项目 provisioning 完成
+
+## 2. 启用 Email + Password 登录
+
+1. **Authentication** → **Providers** → **Email**
+2. 确认 **Enable Email provider** 已开启
+3. MVP 可关闭 **Confirm email**（便于本地 Demo）；生产环境建议开启
+
+## 3. 获取 API 密钥
+
+**Project Settings** → **API**：
+
+| 变量 | 来源 |
+|------|------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon / publishable key |
+| `SUPABASE_SERVICE_ROLE_KEY` | service_role key（**仅服务端**，勿暴露给浏览器） |
+
+写入项目根目录 `.env.local`：
+
+```bash
+cp .env.example .env.local
+# 填入上述三个 Supabase 变量
+```
+
+## 4. 执行数据库迁移
+
+迁移文件：[`supabase/migrations/20250619000000_initial_schema.sql`](../supabase/migrations/20250619000000_initial_schema.sql)
+
+### 方式 A：SQL Editor（推荐，无需 CLI）
+
+1. Dashboard → **SQL Editor** → **New query**
+2. 复制迁移文件全部内容并 **Run**
+3. 确认无报错
+
+### 方式 B：Supabase CLI
+
+```bash
+npm install -g supabase
+supabase login
+supabase link --project-ref <your-project-ref>
+supabase db push
+```
+
+## 5. 验证
+
+在 SQL Editor 中运行：
+
+```sql
+select tablename, rowsecurity
+from pg_tables
+where schemaname = 'public'
+  and tablename in ('audit_tasks', 'audit_issues', 'audit_reports', 'knowledge_base');
+```
+
+期望：`rowsecurity = true`（RLS 已启用）。
+
+检查策略：
+
+```sql
+select tablename, policyname
+from pg_policies
+where schemaname = 'public'
+order by tablename;
+```
+
+## 6. 表结构文档
+
+完整表结构、RLS、索引、关系图见 **[`supabase/schema.md`](../supabase/schema.md)**（canonical，改库必更）。
+
+| 表 | 说明 | RLS |
+|----|------|-----|
+| `audit_tasks` | 审计任务（user_id 隔离） | 仅本人 CRUD |
+| `audit_issues` | 任务关联的风险项 | 通过 task 归属校验 |
+| `audit_reports` | 每任务一份报告 | 通过 task 归属校验 |
+| `knowledge_base` | RAG 政策片段 + vector(1536) | 已登录用户只读 |
+
+## 7. 可选：种子知识库
+
+通过 **service_role** 在服务端插入（Phase 7 将提供脚本）。示例：
+
+```sql
+insert into public.knowledge_base (content, category)
+values
+  ('同一 invoiceId 不得重复入账。', 'duplicate'),
+  ('单笔金额超过历史均值 5 倍需二级审批。', 'anomaly');
+```
+
+## 8. 类型与客户端
+
+| 文件 | 用途 |
+|------|------|
+| `types/audit.ts` | 领域类型（AuditRecord, AuditGraphState 等） |
+| `types/database.ts` | Supabase 表类型 + row mapper |
+| `lib/supabase/client.ts` | 浏览器客户端 |
+| `lib/supabase/server.ts` | Server Component / Route Handler |
+| `lib/supabase/admin.ts` | service_role（仅 server） |
+
+修改表结构后：更新迁移 SQL → **`supabase/schema.md`** → `types/database.ts`（见 `.cursor/rules/database.mdc`）。

@@ -25,7 +25,20 @@ types/ ← 所有层（types 不 import 业务代码）
 
 1. 查 `todo.md` 当前 Phase
 2. 查 `PROJECT.md` 定位模块
-3. 完成后跑 `npm run lint` 和 `npm run build`
+3. 涉及数据库：先读 `supabase/schema.md`
+4. 完成后跑 `npm run lint` 和 `npm run build`
+
+## 数据库 Schema 同步（强制）
+
+**`supabase/schema.md`** 是表结构的 canonical 文档。
+
+每次变更数据库（migration / SQL Editor / Dashboard 改表）后，**同一提交**内必须：
+
+1. 更新 `supabase/migrations/*.sql`
+2. 更新 **`supabase/schema.md`**（表、RLS、索引、变更日志）
+3. 同步 `types/database.ts`（及必要时 `types/audit.ts`）
+
+详见 `.cursor/rules/database.mdc`。
 
 ## 安全
 

@@ -1,0 +1,17 @@
+# Supabase local development config
+# https://supabase.com/docs/guides/cli/config
+
+project_id = "auditlens"
+
+[api]
+enabled = true
+
+[db]
+major_version = 15
+
+[auth]
+enabled = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false

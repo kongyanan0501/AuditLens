@@ -1,0 +1,42 @@
+---
+description: 数据库 schema 变更时必须同步 schema.md 与类型
+globs: supabase/**,types/database.ts,types/audit.ts
+alwaysApply: false
+---
+
+# Database Schema Sync
+
+## Canonical 文档
+
+**`supabase/schema.md`** 是数据库结构的唯一文档源（表、列、索引、RLS、关系、TypeScript 映射）。
+
+修改数据库前：先读 `supabase/schema.md` 了解当前结构。  
+修改数据库后：必须同步更新本文件所列 artifact。
+
+## 触发场景
+
+以下任一操作完成后，**同一提交**内更新 schema 文档：
+
+- 新增 / 修改 `supabase/migrations/*.sql`
+- Supabase SQL Editor 或 Dashboard 改表
+- 调整 RLS policy、index、trigger、grant
+
+## 同步清单（按顺序）
+
+1. **`supabase/migrations/<timestamp>_<name>.sql`** — 可复现的迁移 SQL
+2. **`supabase/schema.md`** — 更新表结构、ER 图、RLS、索引、变更日志
+3. **`types/database.ts`** — `Database` 接口与 `map*Row` 函数
+4. **`types/audit.ts`** — 领域类型（列语义变化时）
+5. **`docs/supabase-setup.md`** — 配置步骤变化时
+
+## 禁止
+
+- 只改 migration 不更新 `schema.md`
+- 只改 SQL 不同步 `types/database.ts`
+- 在业务代码中假设未记录在 `schema.md` 的列或表
+
+## RLS 提醒
+
+- `audit_tasks`：必须 `auth.uid() = user_id`
+- `audit_issues` / `audit_reports`：通过 task 归属校验，UPDATE 需 USING + WITH CHECK
+- 勿用 `user_metadata` 做授权；service_role key 禁止进 client

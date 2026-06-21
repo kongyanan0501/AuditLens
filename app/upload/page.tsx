@@ -1,6 +1,9 @@
 import { UploadCard } from "@/components/UploadCard";
+import { requireAuth } from "@/lib/supabase/require-auth";
 
-export default function UploadPage() {
+export default async function UploadPage() {
+  await requireAuth("/upload");
+
   return (
     <section className="space-y-6">
       <div>

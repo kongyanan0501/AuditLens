@@ -1,2 +1,25 @@
-// Phase 1: Supabase browser client
-export {};
+import { createBrowserClient } from "@supabase/ssr";
+import type { Database } from "@/types/database";
+
+export function createClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !anonKey) {
+    throw new Error(
+      "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    );
+  }
+
+  return createBrowserClient<Database>(url, anonKey);
+}
+
+/** Singleton for client components */
+let browserClient: ReturnType<typeof createClient> | undefined;
+
+export function getSupabaseBrowserClient() {
+  if (!browserClient) {
+    browserClient = createClient();
+  }
+  return browserClient;
+}

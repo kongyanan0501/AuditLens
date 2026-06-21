@@ -21,11 +21,11 @@
 
 ## Phase 1 — 类型与数据模型
 
-- [ ] 定义 `types/audit.ts`（Record, Issue, Task, Report, GraphState）
-- [ ] 创建 Supabase 项目并配置 Auth（Email + Password）
-- [ ] 建表：`audit_tasks`, `audit_issues`, `audit_reports`, `knowledge_base`
-- [ ] 实现 `lib/supabase/client.ts`（浏览器）与服务端 client 辅助函数
-- [ ] Row Level Security：按 `user_id` 隔离
+- [x] 定义 `types/audit.ts`（Record, Issue, Task, Report, GraphState）
+- [x] 创建 Supabase 项目并配置 Auth（Email + Password）— 见 [docs/supabase-setup.md](./docs/supabase-setup.md)
+- [x] 建表：`audit_tasks`, `audit_issues`, `audit_reports`, `knowledge_base` — 见 [supabase/migrations/20250619000000_initial_schema.sql](./supabase/migrations/20250619000000_initial_schema.sql)
+- [x] 实现 `lib/supabase/client.ts`（浏览器）与服务端 client 辅助函数
+- [x] Row Level Security：按 `user_id` 隔离
 
 **完成标准**：类型可被 `server/` 与 `app/` 引用；迁移 SQL 或 Supabase dashboard 已记录。
 
@@ -33,10 +33,10 @@
 
 ## Phase 2 — 认证与路由保护
 
-- [ ] `app/login/page.tsx` — 登录表单
-- [ ] `hooks/useAuth.ts` — session 状态
-- [ ] `middleware.ts` — 保护 `/dashboard`, `/upload`, `/report/*`
-- [ ] 登录后跳转 `/dashboard`；未登录重定向 `/login`
+- [x] `app/login/page.tsx` — 登录表单
+- [x] `hooks/useAuth.ts` — session 状态
+- [x] `middleware.ts` — 保护 `/dashboard`, `/upload`, `/report/*`
+- [x] 登录后跳转 `/dashboard`；未登录重定向 `/login`
 
 **完成标准**：未登录无法访问受保护路由；登录后可见空 Dashboard。
 
@@ -140,8 +140,8 @@
 | Phase | 名称 | 状态 |
 |-------|------|------|
 | 0 | Harness & 脚手架 | `[x]` |
-| 1 | 类型与数据模型 | `[ ]` |
-| 2 | 认证与路由保护 | `[ ]` |
+| 1 | 类型与数据模型 | `[x]` |
+| 2 | 认证与路由保护 | `[x]` |
 | 3 | UI 骨架 | `[ ]` |
 | 4 | AI 基础设施 | `[ ]` |
 | 5 | 审计引擎 | `[ ]` |
@@ -150,4 +150,4 @@
 | 8 | 报告与 Dashboard | `[ ]` |
 | 9 | 打磨与交付 | `[ ]` |
 
-**最后更新**：2026-06-19 — 初始 harness 创建
+**最后更新**：2026-06-21 — Phase 2 认证与路由保护完成

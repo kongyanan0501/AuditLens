@@ -1,7 +1,10 @@
 import { RiskScoreCard } from "@/components/RiskScoreCard";
 import { IssueTable } from "@/components/IssueTable";
+import { requireAuth } from "@/lib/supabase/require-auth";
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  await requireAuth("/dashboard");
+
   return (
     <section className="space-y-6">
       <div>

@@ -1,4 +1,5 @@
 import { ReportViewer } from "@/components/ReportViewer";
+import { requireAuth } from "@/lib/supabase/require-auth";
 
 type ReportPageProps = {
   params: Promise<{ id: string }>;
@@ -6,6 +7,7 @@ type ReportPageProps = {
 
 export default async function ReportPage({ params }: ReportPageProps) {
   const { id } = await params;
+  await requireAuth(`/report/${id}`);
 
   return (
     <section className="space-y-6">

@@ -184,6 +184,10 @@ State 在节点间不可变扩展，类型定义在 `types/audit.ts`。
 
 ## 6. 数据模型
 
+> **Canonical 文档**：[`supabase/schema.md`](../supabase/schema.md) — 含完整列约束、RLS、索引、ER 图。改库后必须同步该文件。
+
+以下摘要供快速浏览；细节以 `schema.md` 为准。
+
 ### audit_tasks
 
 | 字段 | 类型 | 说明 |
@@ -270,6 +274,7 @@ flowchart LR
 | 地图层 | `PROJECT.md` | 入口点、数据流、高风险区 |
 | 任务层 | `todo.md` | 实施顺序，防止越级开发 |
 | 规格层 | `docs/init.md` | 功能需求与示例代码 |
+| Schema 层 | `supabase/schema.md` | 数据库 canonical（改库必更） |
 | 规则层 | `.cursor/rules/*.mdc` | 按 glob 自动注入编码约束 |
 | 验证层 | package.json scripts | 改动后必须跑的检查 |
 
@@ -293,6 +298,7 @@ flowchart LR
 | `core.mdc` | true | — | 全局：TS strict、最小 diff、依赖方向 |
 | `nextjs-app.mdc` | false | app/**, components/** | React、shadcn、client/server 分界 |
 | `server-audit.mdc` | false | server/** | LangGraph 节点、纯函数规则 |
+| `database.mdc` | false | supabase/**, types/database.ts | 改库必同步 schema.md |
 | `ai-layer.mdc` | false | lib/ai-provider.ts, lib/pinecone.ts, server/rag.ts, server/langgraph.ts | 可插拔接口、无硬编码 key |
 
 ### 8.4 AI 修改工作流

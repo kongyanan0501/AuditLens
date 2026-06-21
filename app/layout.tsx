@@ -21,6 +21,7 @@ export const metadata: Metadata = {
 const navItems = [
   { href: "/dashboard", label: "仪表盘" },
   { href: "/upload", label: "上传分析" },
+  { href: "/me", label: "我的" },
 ];
 
 export default function RootLayout({
