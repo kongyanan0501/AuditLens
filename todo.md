@@ -44,13 +44,13 @@
 
 ## Phase 3 — UI 骨架
 
-- [ ] `app/layout.tsx` — 全局导航/侧栏
-- [ ] `app/dashboard/page.tsx` — KPI 占位 + IssueTable 占位
-- [ ] `app/upload/page.tsx` — UploadCard（拖拽区）
-- [ ] `components/UploadCard.tsx`
-- [ ] `components/RiskScoreCard.tsx`
-- [ ] `components/IssueTable.tsx`
-- [ ] `components/ReportViewer.tsx`
+- [x] `app/layout.tsx` — 全局导航/侧栏
+- [x] `app/dashboard/page.tsx` — KPI 占位 + IssueTable 占位
+- [x] `app/upload/page.tsx` — UploadCard（拖拽区）
+- [x] `components/UploadCard.tsx`
+- [x] `components/RiskScoreCard.tsx`
+- [x] `components/IssueTable.tsx`
+- [x] `components/ReportViewer.tsx`
 
 **完成标准**：四页面可导航，组件符合 Fintech 配色，无业务数据亦可渲染。
 
@@ -142,7 +142,7 @@
 | 0 | Harness & 脚手架 | `[x]` |
 | 1 | 类型与数据模型 | `[x]` |
 | 2 | 认证与路由保护 | `[x]` |
-| 3 | UI 骨架 | `[ ]` |
+| 3 | UI 骨架 | `[x]` |
 | 4 | AI 基础设施 | `[ ]` |
 | 5 | 审计引擎 | `[ ]` |
 | 6 | LangGraph | `[ ]` |
@@ -150,4 +150,4 @@
 | 8 | 报告与 Dashboard | `[ ]` |
 | 9 | 打磨与交付 | `[ ]` |
 
-**最后更新**：2026-06-21 — Phase 2 认证与路由保护完成
+**最后更新**：2026-06-21 — Phase 3 UI 骨架完成

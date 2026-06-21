@@ -1,14 +1,28 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Panel } from "@/components/ui/panel";
 import { useAuth } from "@/hooks/useAuth";
 
 function formatDate(iso: string | undefined) {
-  if (!iso) return "—";
+  if (!iso) return "暂无";
   return new Intl.DateTimeFormat("zh-CN", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(iso));
+}
+
+function ProfileSkeleton() {
+  return (
+    <div className="space-y-4">
+      {[1, 2, 3, 4].map((row) => (
+        <div key={row} className="space-y-2">
+          <div className="h-4 w-16 animate-pulse rounded bg-muted" />
+          <div className="h-5 w-full max-w-xs animate-pulse rounded bg-muted/70" />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function ProfileCard() {
@@ -16,47 +30,51 @@ export function ProfileCard() {
 
   if (loading) {
     return (
-      <div className="rounded-lg border bg-card p-6 shadow-sm">
-        <p className="text-sm text-muted-foreground">加载中...</p>
-      </div>
+      <Panel className="p-6">
+        <ProfileSkeleton />
+      </Panel>
     );
   }
 
   if (!user) {
     return (
-      <div className="rounded-lg border bg-card p-6 shadow-sm">
+      <Panel className="p-6">
         <p className="text-sm text-muted-foreground">未登录，请先登录。</p>
-      </div>
+      </Panel>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="rounded-lg border bg-card p-6 shadow-sm">
-        <dl className="space-y-4">
+      <Panel className="p-6">
+        <dl className="grid gap-5 sm:grid-cols-2">
           <div>
-            <dt className="text-sm font-medium text-muted-foreground">邮箱</dt>
-            <dd className="mt-1 text-base">{user.email ?? "—"}</dd>
+            <dt className="al-label">邮箱</dt>
+            <dd className="mt-1 text-base">{user.email ?? "暂无"}</dd>
           </div>
           <div>
-            <dt className="text-sm font-medium text-muted-foreground">用户 ID</dt>
-            <dd className="mt-1 break-all font-mono text-sm text-foreground/80">
+            <dt className="al-label">注册时间</dt>
+            <dd className="mt-1 text-base">{formatDate(user.created_at)}</dd>
+          </div>
+          <div className="sm:col-span-2">
+            <dt className="al-label">用户 ID</dt>
+            <dd className="al-metric mt-1 break-all text-sm text-foreground/80">
               {user.id}
             </dd>
           </div>
           <div>
-            <dt className="text-sm font-medium text-muted-foreground">注册时间</dt>
-            <dd className="mt-1 text-base">{formatDate(user.created_at)}</dd>
-          </div>
-          <div>
-            <dt className="text-sm font-medium text-muted-foreground">上次登录</dt>
+            <dt className="al-label">上次登录</dt>
             <dd className="mt-1 text-base">{formatDate(user.last_sign_in_at)}</dd>
           </div>
         </dl>
-      </div>
+      </Panel>
 
       <form action="/auth/signout" method="post">
-        <Button type="submit" variant="outline" className="w-full sm:w-auto">
+        <Button
+          type="submit"
+          variant="outline"
+          className="w-full active:scale-[0.98] sm:w-auto"
+        >
           退出登录
         </Button>
       </form>

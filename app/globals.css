@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "../styles/auditlens-theme.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -24,41 +25,142 @@
   --color-ring: var(--ring);
   --color-success: var(--success);
   --color-warning: var(--warning);
+  --color-surface-0: var(--surface-0);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-}
-
-:root {
-  --radius: 0.5rem;
-  --background: #f8fafc;
-  --foreground: #0f172a;
-  --card: #ffffff;
-  --card-foreground: #0f172a;
-  --popover: #ffffff;
-  --popover-foreground: #0f172a;
-  --primary: #1e3a8a;
-  --primary-foreground: #f8fafc;
-  --secondary: #e2e8f0;
-  --secondary-foreground: #1e293b;
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
-  --accent: #dbeafe;
-  --accent-foreground: #1e3a8a;
-  --destructive: #ef4444;
-  --success: #16a34a;
-  --warning: #f59e0b;
-  --border: #e2e8f0;
-  --input: #e2e8f0;
-  --ring: #1e3a8a;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+
+  html {
+    @apply scroll-smooth;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+  /* ─── Surfaces ─────────────────────────────────────────── */
+
+  .al-panel {
+    border-radius: var(--radius);
+    border: 1px solid var(--border-subtle);
+    background: var(--card);
+    box-shadow: var(--shadow-panel);
+  }
+
+  .al-panel-interactive {
+    transition:
+      box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+      border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .al-panel-interactive:hover {
+    border-color: var(--border-strong);
+    box-shadow: var(--shadow-panel-hover);
+  }
+
+  .al-panel-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .al-glass {
+    background: var(--sidebar);
+    border: 1px solid var(--sidebar-border);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    box-shadow: var(--shadow-inset-highlight);
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .al-glass {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+  }
+
+  /* ─── Canvas & hero ────────────────────────────────────── */
+
+  .al-canvas {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .al-canvas::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 70% 50% at 15% -5%, var(--mesh-1), transparent 55%),
+      radial-gradient(ellipse 55% 45% at 85% 105%, var(--mesh-2), transparent 50%);
+  }
+
+  .al-hero-panel {
+    background: var(--hero-gradient);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .al-hero-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: var(--hero-mesh);
+  }
+
+  /* ─── Typography ───────────────────────────────────────── */
+
+  .al-display {
+    @apply text-3xl font-semibold tracking-tight md:text-4xl;
+  }
+
+  .al-metric {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+
+  .al-label {
+    @apply text-sm font-medium text-muted-foreground;
+  }
+
+  .al-brand-mark {
+    @apply bg-clip-text font-semibold tracking-tight text-transparent;
+    background-image: linear-gradient(
+      135deg,
+      var(--foreground) 0%,
+      var(--primary) 100%
+    );
+  }
+
+  /* ─── Legacy alias ─────────────────────────────────────── */
+
+  .shadow-card {
+    box-shadow: var(--shadow-panel);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .al-panel-interactive {
+    transition: none;
   }
 }

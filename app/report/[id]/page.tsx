@@ -1,4 +1,5 @@
 import { ReportViewer } from "@/components/ReportViewer";
+import { PageHeader } from "@/components/PageHeader";
 import { requireAuth } from "@/lib/supabase/require-auth";
 
 type ReportPageProps = {
@@ -10,11 +11,11 @@ export default async function ReportPage({ params }: ReportPageProps) {
   await requireAuth(`/report/${id}`);
 
   return (
-    <section className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-primary">审计报告</h1>
-        <p className="text-sm text-muted-foreground">任务 ID: {id}</p>
-      </div>
+    <section className="space-y-8">
+      <PageHeader
+        title="审计报告"
+        description={`任务 ID: ${id}`}
+      />
       <ReportViewer content={null} />
     </section>
   );
