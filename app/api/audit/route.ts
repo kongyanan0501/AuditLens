@@ -6,19 +6,7 @@ import {
 } from "@/server/audit-repository";
 import { runAuditGraph } from "@/server/langgraph";
 import { createClientForRouteHandler } from "@/lib/supabase/route";
-
-const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
-const ALLOWED_EXTENSIONS = [".xlsx", ".xls", ".csv"];
-
-function getExtension(fileName: string): string {
-  const index = fileName.lastIndexOf(".");
-  if (index === -1) return "";
-  return fileName.slice(index).toLowerCase();
-}
-
-function isAllowedFile(file: File): boolean {
-  return ALLOWED_EXTENSIONS.includes(getExtension(file.name));
-}
+import { validateUploadFile } from "@/lib/upload-constraints";
 
 export async function POST(request: NextRequest) {
   const response = NextResponse.json({ ok: true });
@@ -46,23 +34,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!isAllowedFile(fileValue)) {
+    const validation = validateUploadFile(fileValue);
+    if (!validation.ok) {
       return NextResponse.json(
-        { error: "仅支持 .xlsx、.xls、.csv 格式", code: "INVALID_FILE_TYPE" },
-        { status: 400 },
-      );
-    }
-
-    if (fileValue.size === 0) {
-      return NextResponse.json(
-        { error: "文件不能为空", code: "EMPTY_FILE" },
-        { status: 400 },
-      );
-    }
-
-    if (fileValue.size > MAX_FILE_SIZE_BYTES) {
-      return NextResponse.json(
-        { error: "文件大小不能超过 5MB", code: "FILE_TOO_LARGE" },
+        { error: validation.message, code: validation.code },
         { status: 400 },
       );
     }

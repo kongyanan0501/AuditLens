@@ -5,9 +5,13 @@ import { useRouter } from "next/navigation";
 import { FileSpreadsheet, Loader2, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
+import {
+  ALLOWED_ACCEPT,
+  MAX_FILE_SIZE_LABEL,
+  validateUploadFile,
+} from "@/lib/upload-constraints";
 import { cn } from "@/lib/utils";
 
-const ACCEPT = ".xlsx,.xls,.csv";
 const ACCEPT_LABEL = "Excel / CSV";
 
 type AuditApiResponse = {
@@ -39,7 +43,17 @@ export function UploadCard() {
 
   const handleFiles = useCallback((files: FileList | null) => {
     if (!files?.length) return;
-    setFile(files[0]);
+
+    const selected = files[0];
+    const validation = validateUploadFile(selected);
+    if (!validation.ok) {
+      setFile(null);
+      setError(validation.message);
+      if (inputRef.current) inputRef.current.value = "";
+      return;
+    }
+
+    setFile(selected);
     setError(null);
   }, []);
 
@@ -130,7 +144,7 @@ export function UploadCard() {
         <input
           ref={inputRef}
           type="file"
-          accept={ACCEPT}
+          accept={ALLOWED_ACCEPT}
           className="hidden"
           onChange={(event) => handleFiles(event.target.files)}
         />
@@ -144,7 +158,7 @@ export function UploadCard() {
           或点击选择 {ACCEPT_LABEL} 文件
         </p>
         <p className="mt-1 text-xs text-muted-foreground/80">
-          支持 .xlsx、.xls、.csv
+          支持 .xlsx、.xls、.csv，单文件不超过 {MAX_FILE_SIZE_LABEL}
         </p>
       </div>
 

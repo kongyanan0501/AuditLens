@@ -1,3 +1,5 @@
+import { AlertCircle } from "lucide-react";
+import { AlertBanner } from "@/components/AlertBanner";
 import { IssueTable } from "@/components/IssueTable";
 import { PageHeader } from "@/components/PageHeader";
 import { ReportViewer } from "@/components/ReportViewer";
@@ -32,6 +34,24 @@ export default async function ReportPage({ params }: ReportPageProps) {
         title="审计报告"
         description={`${bundle.task.fileName} · 任务 ID: ${id}`}
       />
+
+      {bundle.task.status === "failed" ? (
+        <AlertBanner
+          icon={AlertCircle}
+          variant="error"
+          title="该任务分析失败"
+          description="报告可能不完整。请检查源文件格式与必填列后重新上传。"
+        />
+      ) : null}
+
+      {bundle.task.status === "running" || bundle.task.status === "pending" ? (
+        <AlertBanner
+          icon={AlertCircle}
+          variant="warning"
+          title="任务仍在处理中"
+          description="分析完成后报告内容将自动更新，请稍后刷新页面。"
+        />
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <RiskScoreCard

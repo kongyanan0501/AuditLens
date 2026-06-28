@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { FileText, Upload } from "lucide-react";
+import { FileText, LayoutDashboard, Upload } from "lucide-react";
+import { AlertBanner } from "@/components/AlertBanner";
+import { EmptyState } from "@/components/EmptyState";
 import { IssueTable } from "@/components/IssueTable";
 import {
   PageHeader,
@@ -70,9 +72,36 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       />
 
       {taskId && !bundle ? (
-        <p className="text-sm text-destructive" role="alert">
-          未找到该任务，请确认链接有效或重新上传分析。
-        </p>
+        <AlertBanner
+          icon={LayoutDashboard}
+          variant="error"
+          title="未找到该任务"
+          description="请确认链接有效，或从最近任务列表中选择其他任务。"
+        />
+      ) : null}
+
+      {bundle?.task.status === "failed" ? (
+        <AlertBanner
+          icon={LayoutDashboard}
+          variant="error"
+          title="分析失败"
+          description="该任务未能完成审计流水线。请检查文件格式与必填列后重新上传。"
+        />
+      ) : null}
+
+      {recentTasks.length === 0 ? (
+        <Panel>
+          <EmptyState
+            icon={Upload}
+            title="尚无审计任务"
+            description="上传 Excel 或 CSV 财务数据，系统将自动完成规则检测、异常分析与风险评分。"
+            action={
+              <Button asChild>
+                <Link href="/upload">开始首次分析</Link>
+              </Button>
+            }
+          />
+        </Panel>
       ) : null}
 
       {recentTasks.length > 0 ? (
@@ -129,71 +158,105 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         </Panel>
       ) : null}
 
-      {bundle ? (
-        <div className="flex flex-wrap items-center gap-3">
-          {bundle.report ? (
-            <Button asChild size="sm" variant="outline">
-              <Link href={`/report/${bundle.task.id}`}>
-                <FileText className="size-4" aria-hidden />
-                查看报告
-              </Link>
-            </Button>
-          ) : null}
-          <p className="text-xs text-muted-foreground">
-            任务 ID：{bundle.task.id}
-          </p>
-        </div>
+      {!bundle && recentTasks.length > 0 ? (
+        <Panel>
+          <EmptyState
+            icon={LayoutDashboard}
+            title="选择任务查看详情"
+            description="从上方最近任务列表中选择一条已完成任务，或上传新数据开始分析。"
+            action={
+              <Button asChild variant="outline" size="sm">
+                <Link href="/upload">上传新数据</Link>
+              </Button>
+            }
+            className="py-10"
+          />
+        </Panel>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <RiskScoreCard
-          score={score}
-          label="综合风险评分"
-          description={
-            bundle ? `状态：${statusLabels[bundle.task.status] ?? bundle.task.status}` : "尚无已完成任务"
-          }
-          featured
-        />
-        <RiskScoreCard
-          score={issues.length > 0 ? issues.length : null}
-          label="发现问题"
-          description={bundle ? `共 ${issues.length} 项` : "上传数据后统计"}
-        />
-        <RiskScoreCard
-          score={highCount > 0 ? highCount : null}
-          label="高风险项"
-          variant="danger"
-          description={
-            bundle ? `${highCount} 项需优先复核` : "高风险 issue 数量"
-          }
-        />
-        <RiskScoreCard
-          score={llmCount > 0 ? llmCount : null}
-          label="AI 解释"
-          variant="warning"
-          description={
-            bundle
-              ? llmCount > 0
-                ? `${llmCount} 项已生成 RAG 解释`
-                : "无高风险项或未配置 LLM"
-              : "RAG 增强说明数量"
-          }
-        />
-      </div>
+      {bundle ? (
+        <>
+          <div className="flex flex-wrap items-center gap-3">
+            {bundle.report ? (
+              <Button asChild size="sm" variant="outline">
+                <Link href={`/report/${bundle.task.id}`}>
+                  <FileText className="size-4" aria-hidden />
+                  查看报告
+                </Link>
+              </Button>
+            ) : null}
+            <p className="text-xs text-muted-foreground">
+              任务 ID：{bundle.task.id}
+            </p>
+          </div>
 
-      <div className="grid gap-6 lg:grid-cols-5">
-        <div className="lg:col-span-2">
-          <RiskDistributionChart issues={issues} />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <RiskScoreCard
+              score={score}
+              label="综合风险评分"
+              description={`状态：${statusLabels[bundle.task.status] ?? bundle.task.status}`}
+              featured
+            />
+            <RiskScoreCard
+              score={issues.length > 0 ? issues.length : null}
+              label="发现问题"
+              description={`共 ${issues.length} 项`}
+            />
+            <RiskScoreCard
+              score={highCount > 0 ? highCount : null}
+              label="高风险项"
+              variant="danger"
+              description={`${highCount} 项需优先复核`}
+            />
+            <RiskScoreCard
+              score={llmCount > 0 ? llmCount : null}
+              label="AI 解释"
+              variant="warning"
+              description={
+                llmCount > 0
+                  ? `${llmCount} 项已生成 RAG 解释`
+                  : "无高风险项或未配置 LLM"
+              }
+            />
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-5">
+            <div className="lg:col-span-2">
+              <RiskDistributionChart issues={issues} />
+            </div>
+            <div className="lg:col-span-3">
+              <IssueTable issues={issues} />
+            </div>
+          </div>
+        </>
+      ) : recentTasks.length > 0 ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <RiskScoreCard
+            score={null}
+            label="综合风险评分"
+            description="选择或完成任务后展示"
+            featured
+          />
+          <RiskScoreCard score={null} label="发现问题" description="上传数据后统计" />
+          <RiskScoreCard
+            score={null}
+            label="高风险项"
+            variant="danger"
+            description="高风险 issue 数量"
+          />
+          <RiskScoreCard
+            score={null}
+            label="AI 解释"
+            variant="warning"
+            description="RAG 增强说明数量"
+          />
         </div>
-        <div className="lg:col-span-3">
-          <IssueTable issues={issues} />
-        </div>
-      </div>
+      ) : null}
 
       {!bundle ? (
         <p className="text-center text-xs text-muted-foreground md:hidden">
           <Link href="/upload" className="text-primary hover:underline">
-            前往上传页面开始首次分析
+            前往上传页面开始分析
           </Link>
         </p>
       ) : null}

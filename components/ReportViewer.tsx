@@ -1,3 +1,8 @@
+import Link from "next/link";
+import { FileText } from "lucide-react";
+import { EmptyState } from "@/components/EmptyState";
+import { Button } from "@/components/ui/button";
+
 type ReportSection = {
   title: string;
   body: string;
@@ -6,25 +11,6 @@ type ReportSection = {
 type ReportViewerProps = {
   content: string | null;
 };
-
-const placeholderSections: ReportSection[] = [
-  {
-    title: "执行摘要",
-    body: "审计任务完成后，将在此展示整体风险评级与关键发现摘要。",
-  },
-  {
-    title: "发现项",
-    body: "规则命中与异常检测结果将按严重程度结构化列出，含具体数据引用。",
-  },
-  {
-    title: "风险分析",
-    body: "综合评分、问题分布与内控影响将在此汇总说明。",
-  },
-  {
-    title: "整改建议",
-    body: "基于 RAG 政策上下文与 LLM 分析，生成可执行的整改建议。",
-  },
-];
 
 function parseReportSections(content: string): ReportSection[] | null {
   const normalized = content.replace(/\r\n/g, "\n").trim();
@@ -71,16 +57,22 @@ export function ReportViewer({ content }: ReportViewerProps) {
     return (
       <article className="al-panel overflow-hidden">
         <div className="border-b border-[var(--border-subtle)] px-6 py-4">
-          <h2 className="font-semibold tracking-tight">报告预览</h2>
+          <h2 className="font-semibold tracking-tight">审计报告</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
             分析完成后将自动生成结构化审计报告
           </p>
         </div>
-        <div className="space-y-8 px-6 py-8">
-          {placeholderSections.map((section) => (
-            <ReportSectionBlock key={section.title} {...section} />
-          ))}
-        </div>
+        <EmptyState
+          icon={FileText}
+          title="报告尚未生成"
+          description="任务完成后将包含执行摘要、发现项、风险分析与整改建议四个章节。"
+          action={
+            <Button asChild variant="outline" size="sm">
+              <Link href="/dashboard">返回仪表盘</Link>
+            </Button>
+          }
+          className="py-10"
+        />
       </article>
     );
   }

@@ -35,7 +35,7 @@
 
 | 文档章节 | 主要代码 |
 |----------|----------|
-| §2 上传与解析 | `app/api/audit/route.ts`, `server/parse-excel.ts` |
+| §2 上传与解析 | `app/api/audit/route.ts`, `server/parse-excel.ts`, `lib/upload-constraints.ts` |
 | §3 规则引擎 | `server/rules.ts` |
 | §4 异常检测 | `server/anomaly.ts` |
 | §5 风险评分 | `server/audit-engine.ts`, `types/audit.ts` |
@@ -50,6 +50,7 @@
 
 | 日期 | 摘要 | 模块 |
 |------|------|------|
+| 2026-06-22 | Phase 9：上传校验共享化、加载/错误/空态、README Demo 指南 | `lib/upload-constraints.ts`, `app/*/loading.tsx`, `README.md` |
 | 2026-06-21 | Phase 8：ReportGeneration 结构化报告、Dashboard 任务列表与风险分布图、Upload 全链路 | `server/report.ts`, `app/dashboard/page.tsx` |
 | 2026-06-21 | 新增 `AI_PROVIDER=qwen`（DashScope chat + embed），RAG/seed 支持 `DASHSCOPE_API_KEY` | `lib/ai-provider.ts`, `server/rag.ts`, `scripts/seed-knowledge-base.ts` |
 | 2026-06-21 | 初版：汇总 Phase 1–7 已落地的规则、评分、RAG、API 约束 | 全文档 |
@@ -80,6 +81,7 @@
 | 空文件 | 拒绝 |
 | 鉴权 | 须登录；`audit_tasks.user_id = auth.uid()` |
 | 失败响应 | 422 + `taskId`（已创建 task 时） |
+| 校验实现 | 服务端与客户端共用 `lib/upload-constraints.ts` |
 
 ### 2.2 财务行模型（`AuditRecord`）
 
@@ -308,11 +310,25 @@ Prompt 要求返回 JSON：
 
 ---
 
-## 13. 刻意延期（非当前决策）
+## 14. UI 状态与体验（Phase 9）
 
-以下在 [todo.md](../todo.md) 后续 Phase 实现，**尚未生效**：
+| 决策 | 说明 |
+|------|------|
+| 加载态 | `dashboard` / `upload` / `report/[id]` 路由提供 `loading.tsx` 骨架屏 |
+| 错误态 | 根 `error.tsx` 全局错误边界；`AlertBanner` 展示任务失败/未找到 |
+| 空数据态 | `EmptyState` 用于无任务、无 issue、无报告；Dashboard 引导上传 |
+| 404 | 根 `not-found.tsx`；报告页 `report/[id]/not-found.tsx` |
+| 客户端校验 | 选文件时调用 `validateUploadFile`，与 API 规则一致 |
 
-- API 更细粒度输入校验 polish
-- 加载态 / 错误态 / 空数据态全面打磨
+实现：`components/EmptyState.tsx`, `components/AlertBanner.tsx`, `components/PageLoadingSkeleton.tsx`, `components/UploadCard.tsx`
 
-变更上述范围时，须在本文件新增章节或移出 §13，并更新变更日志。
+---
+
+## 15. 刻意延期（非当前决策）
+
+以下尚未纳入 MVP，变更时须新增章节并更新变更日志：
+
+- 任务进度实时推送（WebSocket / polling）
+- 多文件批量上传
+
+---
