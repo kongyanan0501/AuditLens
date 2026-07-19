@@ -33,13 +33,18 @@ cp .env.example .env.local
 
 ## 4. 执行数据库迁移
 
-迁移文件：[`supabase/migrations/20250619000000_initial_schema.sql`](../supabase/migrations/20250619000000_initial_schema.sql)
+迁移文件：
+
+1. [`supabase/migrations/20250619000000_initial_schema.sql`](../supabase/migrations/20250619000000_initial_schema.sql)（仅全新空库需要）
+2. [`supabase/migrations/20260719000000_phase11_enterprise.sql`](../supabase/migrations/20260719000000_phase11_enterprise.sql)（**推荐**：幂等，内含 Phase 1 基础表 + Phase 11）
+
+若库不完整 / 曾报 `already exists` / `relation does not exist`：**只跑文件 2 即可**（整文件一次 Run）。
 
 ### 方式 A：SQL Editor（推荐，无需 CLI）
 
 1. Dashboard → **SQL Editor** → **New query**
-2. 复制迁移文件全部内容并 **Run**
-3. 确认无报错
+2. 复制 `20260719000000_phase11_enterprise.sql` **全部内容**并 **Run**
+3. 确认无报错（可重复执行）
 
 ### 方式 B：Supabase CLI
 
@@ -50,7 +55,20 @@ supabase link --project-ref <your-project-ref>
 supabase db push
 ```
 
-## 5. 验证
+## 5. 迁移后刷新 API Schema Cache（必做）
+
+SQL Editor 改表后，PostgREST 可能短暂找不到新表/新列（报错 `PGRST205` / `schema cache`）。在**同一项目**执行：
+
+```sql
+notify pgrst, 'reload schema';
+```
+
+仍无效时：Dashboard → **Project Settings** → **General** → **Pause project** 再 **Restore**（会短暂中断），或开 Support 里的 API restart。  
+也可在 **Table Editor** 确认能看到 `profiles`；若看不到，说明迁移未落在当前项目。
+
+---
+
+## 6. 验证
 
 在 SQL Editor 中运行：
 
@@ -58,7 +76,15 @@ supabase db push
 select tablename, rowsecurity
 from pg_tables
 where schemaname = 'public'
-  and tablename in ('audit_tasks', 'audit_issues', 'audit_reports', 'knowledge_base');
+  and tablename in (
+    'audit_tasks',
+    'audit_issues',
+    'audit_reports',
+    'knowledge_base',
+    'profiles',
+    'audit_issue_events',
+    'audit_rule_configs'
+  );
 ```
 
 期望：`rowsecurity = true`（RLS 已启用）。
@@ -72,7 +98,7 @@ where schemaname = 'public'
 order by tablename;
 ```
 
-## 6. 表结构文档
+## 7. 表结构文档
 
 完整表结构、RLS、索引、关系图见 **[`supabase/schema.md`](../supabase/schema.md)**（canonical，改库必更）。
 
@@ -83,7 +109,7 @@ order by tablename;
 | `audit_reports` | 每任务一份报告 | 通过 task 归属校验 |
 | `knowledge_base` | RAG 政策片段 + vector(1536) | 已登录用户只读 |
 
-## 7. 可选：种子知识库
+## 8. 可选：种子知识库
 
 通过 **service_role** 在服务端插入（Phase 7 脚本）。配置好 env 后运行：
 
@@ -112,7 +138,13 @@ values
   ('单笔金额超过历史均值 5 倍需二级审批。', 'anomaly');
 ```
 
-## 8. 类型与客户端
+## 9. Storage（线上整改附件）
+
+1. 执行迁移 [`20260719100000_online_remediation.sql`](../supabase/migrations/20260719100000_online_remediation.sql)（会创建 private bucket `issue-remediation`）
+2. Dashboard → **Storage** 确认 bucket 存在且 **Public** 关闭
+3. 上传/下载由服务端 `SUPABASE_SERVICE_ROLE_KEY` 完成；浏览器只拿签名 URL
+
+## 10. 类型与客户端
 
 | 文件 | 用途 |
 |------|------|

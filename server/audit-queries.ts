@@ -5,7 +5,9 @@ import type {
   AuditTask,
   IssueSeverity,
   IssueType,
+  IssueWorkflowStatus,
   TaskStatus,
+  UserRole,
 } from "@/types/audit";
 import type { Database } from "@/types/database";
 import { mapIssueRow, mapReportRow, mapTaskRow } from "@/types/database";
@@ -30,6 +32,15 @@ function mapRowToAuditIssue(
     severity: mapped.severity as IssueSeverity,
     reason: mapped.reason,
     metadata,
+    workflowStatus: mapped.workflowStatus as IssueWorkflowStatus,
+    assigneeId: mapped.assigneeId,
+    resolutionNote: mapped.resolutionNote,
+    statusUpdatedAt: mapped.statusUpdatedAt,
+    statusUpdatedBy: mapped.statusUpdatedBy,
+    remediationAction: mapped.remediationAction,
+    remediationResult: mapped.remediationResult,
+    remediationSubmittedAt: mapped.remediationSubmittedAt,
+    remediationSubmittedBy: mapped.remediationSubmittedBy,
   };
 }
 
@@ -41,13 +52,13 @@ export type AuditTaskBundle = {
 
 export async function listUserAuditTasks(
   supabase: DbClient,
-  userId: string,
+  _userId: string,
   limit = 10,
 ): Promise<AuditTask[]> {
+  // RLS: auditor sees all; others see owned / assigned-issue tasks
   const { data, error } = await supabase
     .from("audit_tasks")
     .select("*")
-    .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -64,14 +75,34 @@ export async function listUserAuditTasks(
   });
 }
 
+/** Business inbox: issues assigned to the current user (cross-task). */
+export async function listAssignedIssues(
+  supabase: DbClient,
+  userId: string,
+  limit = 50,
+): Promise<AuditIssue[]> {
+  const { data, error } = await supabase
+    .from("audit_issues")
+    .select("*")
+    .eq("assignee_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).map(mapRowToAuditIssue);
+}
+
 export async function getLatestCompletedTaskBundle(
   supabase: DbClient,
   userId: string,
+  role: UserRole = "auditor",
 ): Promise<AuditTaskBundle | null> {
   const { data: taskRow, error } = await supabase
     .from("audit_tasks")
     .select("id")
-    .eq("user_id", userId)
     .eq("status", "completed")
     .order("created_at", { ascending: false })
     .limit(1)
@@ -84,19 +115,20 @@ export async function getLatestCompletedTaskBundle(
     return null;
   }
 
-  return getAuditTaskBundle(supabase, taskRow.id, userId);
+  return getAuditTaskBundle(supabase, taskRow.id, userId, role);
 }
 
 export async function getAuditTaskBundle(
   supabase: DbClient,
   taskId: string,
   userId: string,
+  role: UserRole = "auditor",
 ): Promise<AuditTaskBundle | null> {
+  // Rely on RLS for access (owner or assignee)
   const { data: taskRow, error: taskError } = await supabase
     .from("audit_tasks")
     .select("*")
     .eq("id", taskId)
-    .eq("user_id", userId)
     .maybeSingle();
 
   if (taskError) {
@@ -106,11 +138,17 @@ export async function getAuditTaskBundle(
     return null;
   }
 
-  const { data: issueRows, error: issuesError } = await supabase
+  let issuesQuery = supabase
     .from("audit_issues")
     .select("*")
     .eq("task_id", taskId)
     .order("created_at", { ascending: true });
+
+  if (role === "business") {
+    issuesQuery = issuesQuery.eq("assignee_id", userId);
+  }
+
+  const { data: issueRows, error: issuesError } = await issuesQuery;
 
   if (issuesError) {
     throw issuesError;

@@ -1,8 +1,10 @@
 # AuditLens — Database Schema（Canonical）
 
 > **数据库结构的唯一文档源。** 任何 schema 变更后必须同步更新本文件。  
-> 来源迁移：[`migrations/20250619000000_initial_schema.sql`](./migrations/20250619000000_initial_schema.sql)  
-> 最后同步：**2026-06-19** · Phase 1 initial
+> 来源迁移：  
+> - [`migrations/20250619000000_initial_schema.sql`](./migrations/20250619000000_initial_schema.sql)  
+> - [`migrations/20260719000000_phase11_enterprise.sql`](./migrations/20260719000000_phase11_enterprise.sql)  
+> 最后同步：**2026-07-19** · Phase 11 enterprise
 
 ---
 
@@ -24,12 +26,18 @@
 
 ```mermaid
 erDiagram
+  auth_users ||--o| profiles : has
   auth_users ||--o{ audit_tasks : owns
+  auth_users ||--o{ audit_issues : assigned
   audit_tasks ||--o{ audit_issues : has
   audit_tasks ||--o| audit_reports : has_one
+  audit_issues ||--o{ audit_issue_events : trail
+  auth_users ||--o{ audit_rule_configs : changes
 
-  auth_users {
+  profiles {
     uuid id PK
+    text role
+    text display_name
   }
 
   audit_tasks {
@@ -38,174 +46,203 @@ erDiagram
     text file_name
     text status
     int score
-    timestamptz created_at
-    timestamptz updated_at
   }
 
   audit_issues {
     uuid id PK
     uuid task_id FK
+    text workflow_status
+    uuid assignee_id FK
     text type
     text severity
-    text reason
-    jsonb metadata
-    timestamptz created_at
   }
 
-  audit_reports {
+  audit_issue_events {
     uuid id PK
-    uuid task_id FK UK
-    text content
-    timestamptz created_at
+    uuid issue_id FK
+    uuid actor_id FK
+    text from_status
+    text to_status
+  }
+
+  audit_rule_configs {
+    uuid id PK
+    text scope_key
+    int version
+    bool is_active
   }
 
   knowledge_base {
     uuid id PK
+    text policy_name
+    text clause_id
     text content
-    vector embedding
-    text category
-    timestamptz created_at
   }
 ```
 
 ---
 
-## Extensions
+### `public.profiles`
 
-| Extension | Schema | 用途 |
-|-----------|--------|------|
-| `vector` | `extensions` | `knowledge_base.embedding`（1536 维，OpenAI text-embedding-3-small） |
-
----
-
-## Tables
-
-### `public.audit_tasks`
-
-审计任务主表，按 `user_id` 隔离。
+用户角色（审计 / 业务）。注册时由 `handle_new_user` 触发器默认创建 `auditor`。
 
 | 列 | 类型 | 约束 | 说明 |
 |----|------|------|------|
-| `id` | `uuid` | PK, default `gen_random_uuid()` | 任务 ID |
-| `user_id` | `uuid` | NOT NULL, FK → `auth.users(id)` ON DELETE CASCADE | 所属用户 |
+| `id` | `uuid` | PK, FK → `auth.users` | 同用户 ID |
+| `role` | `text` | NOT NULL, default `auditor`, CHECK | `auditor` \| `business` |
+| `display_name` | `text` | nullable | 展示名 |
+| `created_at` / `updated_at` | `timestamptz` | NOT NULL | 时间戳 |
+
+---
+
+### `public.audit_tasks`
+
+| 列 | 类型 | 约束 | 说明 |
+|----|------|------|------|
+| `id` | `uuid` | PK | 任务 ID |
+| `user_id` | `uuid` | NOT NULL, FK → `auth.users` | 创建者（审计） |
 | `file_name` | `text` | NOT NULL | 上传文件名 |
-| `status` | `text` | NOT NULL, default `'pending'`, CHECK | `pending` \| `running` \| `completed` \| `failed` |
-| `score` | `integer` | CHECK NULL OR 0–100 | 风险评分 |
-| `created_at` | `timestamptz` | NOT NULL, default `now()` | 创建时间 |
-| `updated_at` | `timestamptz` | NOT NULL, default `now()` | 更新时间（trigger 维护） |
-
-**Indexes**
-
-| 名称 | 列 |
-|------|-----|
-| `audit_tasks_user_id_idx` | `user_id` |
-| `audit_tasks_status_idx` | `status` |
-
-**Triggers**
-
-| 名称 | 事件 | 函数 |
-|------|------|------|
-| `audit_tasks_set_updated_at` | BEFORE UPDATE | `public.set_updated_at()` |
+| `status` | `text` | CHECK | `pending` \| `running` \| `completed` \| `failed` |
+| `score` | `integer` | 0–100 或 null | 风险评分 |
+| `rule_config_version` | `integer` | nullable | 任务运行时所用规则配置版本 |
+| `created_at` / `updated_at` | `timestamptz` | NOT NULL | 时间戳 |
 
 ---
 
 ### `public.audit_issues`
 
-任务关联的风险项（规则 / 异常产出）。
-
 | 列 | 类型 | 约束 | 说明 |
 |----|------|------|------|
-| `id` | `uuid` | PK, default `gen_random_uuid()` | Issue ID |
-| `task_id` | `uuid` | NOT NULL, FK → `audit_tasks(id)` ON DELETE CASCADE | 所属任务 |
-| `type` | `text` | NOT NULL | 如 `duplicate`, `anomaly`, `approval`, `vendor_concentration` |
-| `severity` | `text` | NOT NULL, CHECK | `low` \| `medium` \| `high` |
+| `id` | `uuid` | PK | Issue ID |
+| `task_id` | `uuid` | NOT NULL, FK → `audit_tasks` | 所属任务 |
+| `type` | `text` | NOT NULL | `duplicate` / `anomaly` / `approval` / `vendor_concentration` |
+| `severity` | `text` | CHECK | `low` \| `medium` \| `high` |
 | `reason` | `text` | NOT NULL | 规则说明或 LLM 解释 |
-| `metadata` | `jsonb` | NOT NULL, default `'{}'` | 关联 record 等扩展字段 |
-| `created_at` | `timestamptz` | NOT NULL, default `now()` | 创建时间 |
+| `metadata` | `jsonb` | default `{}` | evidence、ruleId、workpaper 等 |
+| `workflow_status` | `text` | default `pending_review` | 工单状态（见下） |
+| `assignee_id` | `uuid` | FK → `auth.users`, nullable | 分派给业务用户 |
+| `resolution_note` | `text` | nullable | 最近备注 |
+| `status_updated_at` | `timestamptz` | nullable | 状态更新时间 |
+| `status_updated_by` | `uuid` | FK, nullable | 操作人 |
+| `remediation_action` | `text` | nullable | 整改措施说明 |
+| `remediation_result` | `text` | nullable | 整改完成说明 |
+| `remediation_submitted_at` | `timestamptz` | nullable | 最近提交验收时间 |
+| `remediation_submitted_by` | `uuid` | FK, nullable | 提交人 |
+| `created_at` | `timestamptz` | NOT NULL | 创建时间 |
 
-**Indexes**
+**工单状态**：`pending_review` → `confirmed` / `false_positive` → `remediating` → `pending_verification` → `closed`（可重新打开为 `pending_review`；误报可直关）。
 
-| 名称 | 列 |
-|------|-----|
-| `audit_issues_task_id_idx` | `task_id` |
+**Indexes**：`task_id`, `assignee_id`, `workflow_status`
+
+---
+
+### `public.audit_issue_attachments`
+
+整改证明附件元数据；文件在 Storage bucket `issue-remediation`（private，API 用 service_role 读写）。
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| `id` | `uuid` PK | 附件 ID |
+| `issue_id` | `uuid` FK → `audit_issues` | 关联问题 |
+| `uploaded_by` | `uuid` FK → `auth.users` | 上传人 |
+| `kind` | `text` | `evidence` \| `corrected_file` |
+| `file_name` / `mime_type` / `byte_size` | | 原始文件信息（≤10MB） |
+| `storage_path` | `text` | bucket 内路径 |
+| `created_at` | `timestamptz` | 上传时间 |
+
+**Indexes**：`(issue_id, created_at)`
+
+---
+
+### `public.audit_issue_events`
+
+工单状态变更轨迹。
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| `id` | `uuid` PK | 事件 ID |
+| `issue_id` | `uuid` FK | 关联 issue |
+| `actor_id` | `uuid` FK nullable | 操作人 |
+| `from_status` / `to_status` | `text` | 状态迁移 |
+| `note` | `text` nullable | 备注 |
+| `created_at` | `timestamptz` | 时间 |
+
+---
+
+### `public.audit_rule_configs`
+
+版本化规则阈值；每个 `scope_key` 仅一条 `is_active = true`。
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| `scope_key` | `text` | 默认 `default`（公司/事业部可选） |
+| `amount_anomaly_multiplier` | `float` | 金额异常倍数，默认 5 |
+| `vendor_concentration_threshold` | `float` | 供应商占比阈值，默认 0.5 |
+| `approval_required_min_amount` | `float` | 必审金额，默认 0（全部支出） |
+| `version` | `integer` | 递增版本 |
+| `is_active` | `boolean` | 是否当前生效 |
+| `changed_by` / `change_note` / `created_at` | | 变更追溯 |
 
 ---
 
 ### `public.audit_reports`
 
-每个任务唯一一份审计报告。
-
-| 列 | 类型 | 约束 | 说明 |
-|----|------|------|------|
-| `id` | `uuid` | PK, default `gen_random_uuid()` | Report ID |
-| `task_id` | `uuid` | NOT NULL, UNIQUE, FK → `audit_tasks(id)` ON DELETE CASCADE | 所属任务（1:1） |
-| `content` | `text` | NOT NULL | Markdown 报告正文 |
-| `created_at` | `timestamptz` | NOT NULL, default `now()` | 创建时间 |
+每个任务唯一一份审计报告（同 Phase 1）。
 
 ---
 
 ### `public.knowledge_base`
 
-RAG 政策 / 规则知识片段。
-
-| 列 | 类型 | 约束 | 说明 |
-|----|------|------|------|
-| `id` | `uuid` | PK, default `gen_random_uuid()` | 条目 ID |
-| `content` | `text` | NOT NULL | 政策原文 |
-| `embedding` | `extensions.vector(1536)` | nullable | 向量（服务端写入） |
-| `category` | `text` | nullable | 分类标签 |
-| `created_at` | `timestamptz` | NOT NULL, default `now()` | 创建时间 |
-
-**Indexes**
-
-| 名称 | 列 |
-|------|-----|
-| `knowledge_base_category_idx` | `category` |
+| 列 | 类型 | 说明 |
+|----|------|------|
+| `content` | `text` | 含制度名+条款号的正文 |
+| `policy_name` | `text` nullable | 制度名 |
+| `clause_id` | `text` nullable | 条款号 |
+| `embedding` | `vector(1536)` | 向量 |
+| `category` | `text` nullable | 风险类型标签 |
 
 ---
 
 ## Functions
 
-### `public.set_updated_at()`
-
-| 属性 | 值 |
-|------|-----|
-| 语言 | `plpgsql` |
-| 用途 | UPDATE 时自动设置 `updated_at = now()` |
-| 安全 | INVOKER（默认） |
+| 函数 | 说明 |
+|------|------|
+| `public.set_updated_at()` | UPDATE 时刷新 `updated_at` |
+| `public.handle_new_user()` | 新用户插入默认 `profiles` |
+| `public.current_user_role()` | 返回当前用户角色（SECURITY DEFINER） |
+| `public.is_task_owner(uuid)` | 当前用户是否为任务 owner（SECURITY DEFINER，供 RLS） |
+| `public.has_assigned_issue_on_task(uuid)` | 当前用户是否在该任务上有分派 issue（SECURITY DEFINER） |
+| `public.can_access_issue(uuid)` | 当前用户是否可访问该 issue（SECURITY DEFINER） |
 
 ---
 
 ## Row Level Security
 
-所有 `public` 业务表均已 **ENABLE ROW LEVEL SECURITY**。
+所有业务表均 **ENABLE ROW LEVEL SECURITY**。
 
-### `audit_tasks`
+### 访问原则（Phase 11）
 
-| Policy | 操作 | 角色 | 条件 |
-|--------|------|------|------|
-| `audit_tasks_select_own` | SELECT | `authenticated` | `auth.uid() = user_id` |
-| `audit_tasks_insert_own` | INSERT | `authenticated` | WITH CHECK `auth.uid() = user_id` |
-| `audit_tasks_update_own` | UPDATE | `authenticated` | USING + WITH CHECK `auth.uid() = user_id` |
-| `audit_tasks_delete_own` | DELETE | `authenticated` | `auth.uid() = user_id` |
+| 角色 | 可见范围 |
+|------|----------|
+| **auditor** | 全部 tasks / issues / reports / profiles（`current_user_role() = auditor`） |
+| **business**（assignee） | 仅 `assignee_id = auth.uid()` 的 issues；Dashboard 主列表为「我的待办」；可看到含这些 issues 的 tasks / reports |
 
-### `audit_issues` / `audit_reports`
+### 主要 policies
 
-通过所属 `audit_tasks.user_id = auth.uid()` 校验（EXISTS 子查询）。  
-UPDATE 策略均包含 **USING + WITH CHECK**（防 `user_id` 被篡改转移归属）。
+| 表 | Policy 要点 |
+|----|-------------|
+| `profiles` | 本人 SELECT / INSERT / UPDATE；auditor 可读全部 |
+| `audit_tasks` SELECT | auditor **或** owner **或** `has_assigned_issue_on_task(id)` |
+| `audit_issues` SELECT/UPDATE | auditor **或** assignee **或** `is_task_owner(task_id)` |
+| `audit_reports` SELECT | auditor **或** `is_task_owner` **或** `has_assigned_issue_on_task` |
+| `audit_issue_events` | `can_access_issue(issue_id)` |
+| `audit_issue_attachments` SELECT | `can_access_issue(issue_id)` |
+| `audit_issue_attachments` INSERT/DELETE | assignee + issue `remediating` + 本人上传（API 亦可用 service_role） |
+| `audit_rule_configs` | 已登录可读；仅 `current_user_role() = auditor` 可写 |
+| `knowledge_base` | 已登录只读 |
+| Storage `issue-remediation` | private；推荐仅 service_role 上传/签名下载 |
 
-| 表 | Policies | 操作 |
-|----|----------|------|
-| `audit_issues` | `*_select_own`, `*_insert_own`, `*_update_own`, `*_delete_own` | CRUD |
-| `audit_reports` | 同上 | CRUD |
-
-### `knowledge_base`
-
-| Policy | 操作 | 角色 | 条件 |
-|--------|------|------|------|
-| `knowledge_base_select_authenticated` | SELECT | `authenticated` | `true`（只读） |
-
-写入通过 **service_role** 或 migration 种子完成；authenticated 无 INSERT/UPDATE/DELETE policy。
+跨表可见性检查必须通过 **SECURITY DEFINER** 函数（`is_task_owner` / `has_assigned_issue_on_task` / `can_access_issue`），避免 `audit_tasks` ↔ `audit_issues` policy 互相 EXISTS 导致 `42P17` 无限递归。
 
 ---
 
@@ -213,10 +250,13 @@ UPDATE 策略均包含 **USING + WITH CHECK**（防 `user_id` 被篡改转移归
 
 ```sql
 GRANT USAGE ON SCHEMA public TO authenticated;
-
+GRANT SELECT, INSERT, UPDATE ON public.profiles TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.audit_tasks TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.audit_issues TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.audit_reports TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.audit_issue_events TO authenticated;
+GRANT SELECT, INSERT, DELETE ON public.audit_issue_attachments TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.audit_rule_configs TO authenticated;
 GRANT SELECT ON public.knowledge_base TO authenticated;
 ```
 
@@ -224,12 +264,16 @@ GRANT SELECT ON public.knowledge_base TO authenticated;
 
 ## TypeScript 映射
 
-| DB 表 | `types/database.ts` | 领域类型 `types/audit.ts` |
-|-------|---------------------|---------------------------|
-| `audit_tasks` | `Tables.audit_tasks` | `AuditTask`（via `mapTaskRow`） |
-| `audit_issues` | `Tables.audit_issues` | `AuditIssue`（via `mapIssueRow`） |
-| `audit_reports` | `Tables.audit_reports` | `AuditReport`（via `mapReportRow`） |
-| `knowledge_base` | `Tables.knowledge_base` | `KnowledgeEntry` |
+| DB 表 | `types/database.ts` | 领域类型 |
+|-------|---------------------|----------|
+| `profiles` | `Tables.profiles` | `UserRole` / `UserProfile` |
+| `audit_tasks` | `mapTaskRow` | `AuditTask` |
+| `audit_issues` | `mapIssueRow` | `AuditIssue`（含 workflow / remediation） |
+| `audit_issue_attachments` | `mapAttachmentRow` | `IssueAttachment` |
+| `audit_issue_events` | `mapIssueEventRow` | `IssueWorkflowEvent` |
+| `audit_rule_configs` | `mapRuleConfigRow` | `RuleThresholdConfig` |
+| `audit_reports` | `mapReportRow` | `AuditReport` |
+| `knowledge_base` | — | `KnowledgeEntry` |
 
 ---
 
@@ -237,4 +281,8 @@ GRANT SELECT ON public.knowledge_base TO authenticated;
 
 | 日期 | Migration | 说明 |
 |------|-----------|------|
+| 2026-07-19 | `20260719100000_online_remediation.sql` | `pending_verification`、整改快照列、`audit_issue_attachments`、Storage bucket `issue-remediation` |
+| 2026-07-19 | `20260719030000_phase11_fix_rls_recursion.sql` | 用 SECURITY DEFINER 打断 tasks↔issues RLS 递归（业务角色打开 Dashboard 的 42P17） |
+| 2026-07-19 | `20260719020000_phase11_rls_auditor_scope.sql` | auditor 全量可读；profiles 审计可读全部；与设计「审计看全量」对齐 |
+| 2026-07-19 | `20260719000000_phase11_enterprise.sql` | profiles 角色、issue 工单字段与轨迹、规则配置版本表、KB 制度条款字段、RLS 分派可见性 |
 | 2026-06-19 | `20250619000000_initial_schema.sql` | 初始 4 表 + pgvector + RLS + grants |

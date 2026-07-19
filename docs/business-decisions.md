@@ -36,13 +36,14 @@
 | 文档章节 | 主要代码 |
 |----------|----------|
 | §2 上传与解析 | `app/api/audit/route.ts`, `server/parse-excel.ts`, `lib/upload-constraints.ts` |
-| §3 规则引擎 | `server/rules.ts` |
-| §4 异常检测 | `server/anomaly.ts` |
+| §3 规则引擎 | `server/rules.ts`, `server/rule-config.ts` |
+| §4 异常检测 | `server/anomaly.ts`, `server/rule-config.ts` |
 | §5 风险评分 | `server/audit-engine.ts`, `types/audit.ts` |
 | §6 RAG + LLM | `server/rag.ts`, `server/langgraph.ts` |
 | §7 持久化 | `server/audit-repository.ts`, `types/audit.ts` |
+| §8 认证隔离 | `middleware.ts`, `server/profiles.ts`, `supabase/schema.md` |
 | §11 报告生成 | `server/report.ts`, `components/ReportViewer.tsx` |
-| §8 认证隔离 | `middleware.ts`, `supabase/schema.md` |
+| §16 工单与角色 | `server/issue-workflow.ts`, `components/IssueWorkbench.tsx` |
 
 ---
 
@@ -50,6 +51,11 @@
 
 | 日期 | 摘要 | 模块 |
 |------|------|------|
+| 2026-07-19 | 线上整改验收：业务提交说明+附件→待验收；审计通过关闭/驳回；禁止业务直关 | `server/issue-workflow.ts`, `server/issue-attachments.ts`, `supabase/migrations/20260719100000_online_remediation.sql` |
+| 2026-07-19 | 修复业务角色 Dashboard RLS 无限递归（`42P17`）：跨表可见性改 SECURITY DEFINER 函数 | `supabase/migrations/20260719030000_phase11_fix_rls_recursion.sql` |
+| 2026-07-19 | Phase 11 验收修补：auditor RLS 全量、业务 Dashboard「我的待办」、制度种子≥2/类、`《制度》条款` 引用、规则变更历史、非法流转 409 | `supabase/migrations/20260719020000_phase11_rls_auditor_scope.sql`, `app/dashboard/page.tsx`, `server/rag.ts`, `server/rule-config.ts` |
+| 2026-07-19 | Phase 11 收口：任务 `rule_config_version`、导出含规则版本、变更备注必填、业务仅 remediating→closed、演示角色切换需 `ALLOW_DEMO_ROLE_SWITCH`、`/settings/rules` | `server/audit-repository.ts`, `lib/report-export.ts`, `app/settings/rules/page.tsx` |
+| 2026-07-19 | Phase 11：制度条款知识库、可配置规则阈值（版本追溯）、Issue 工单闭环、审计/业务角色与 RLS、底稿归档与导出元数据 | `server/rule-config.ts`, `server/issue-workflow.ts`, `server/profiles.ts`, `supabase/migrations/20260719000000_phase11_enterprise.sql` |
 | 2026-07-19 | 企业 Demo 包：`metadata.evidence` 快照、Executive Brief、Issue 工作台筛选/展开、报告客户端导出 | `server/evidence.ts`, `server/brief.ts`, `components/IssueWorkbench.tsx`, `components/ReportActions.tsx` |
 | 2026-06-22 | Phase 9：上传校验共享化、加载/错误/空态、README Demo 指南 | `lib/upload-constraints.ts`, `app/*/loading.tsx`, `README.md` |
 | 2026-06-21 | Phase 8：ReportGeneration 结构化报告、Dashboard 任务列表与风险分布图、Upload 全链路 | `server/report.ts`, `app/dashboard/page.tsx` |
@@ -115,6 +121,21 @@
 
 ## 3. 规则引擎（确定性）
 
+### 3.0 可配置阈值（Phase 11）
+
+| 项 | 决策 |
+|----|------|
+| 存储 | `audit_rule_configs`；每 `scope_key`（默认 `default`）一条 `is_active` |
+| 字段 | `amount_anomaly_multiplier`、`vendor_concentration_threshold`、`approval_required_min_amount` |
+| 变更 | 发布新版本（旧版 `is_active=false`），**须填** `change_note`；记录 `changed_by` / `version` |
+| 运行时 | 上传分析时读取生效配置写入 graph `ruleConfig`；完成后写入 `audit_tasks.rule_config_version` |
+| 命中元数据 | `metadata.ruleId` + `ruleVersion` + `scopeKey` + `thresholds` |
+| 规则 ID | `R-DUP-001` / `R-APR-001` / `R-ANM-001` / `R-VEN-001` |
+| 默认值 | 倍数 5、集中度 0.5、必审金额 0（全部支出需审批） |
+| 生效范围 | 仅影响**之后新跑**任务；已落库 issue 不回溯 |
+
+实现：`server/rule-config.ts`；UI：`/settings/rules` 与 `/me` → `RuleConfigForm`（仅审计角色）
+
 ### 3.1 重复发票（`duplicate`）
 
 | 项 | 决策 |
@@ -122,14 +143,17 @@
 | 触发条件 | 同一 `invoiceId`（trim 后非空）出现 **> 1** 次 |
 | 严重程度 | **high** |
 | 空 invoiceId | 不参与重复统计 |
+| 规则 ID | `R-DUP-001` |
 
 ### 3.2 审批缺失（`approval`）
 
 | 项 | 决策 |
 |----|------|
-| 触发条件 | `type === expense` 且 `approvedBy` 为空/空白 |
+| 触发条件 | `type === expense` 且 `amount ≥ approval_required_min_amount` 且 `approvedBy` 为空/空白 |
 | 严重程度 | **medium** |
 | 收入记录 | 不检查审批 |
+| 必审金额 0 | 兼容原行为：全部支出须审批 |
+| 规则 ID | `R-APR-001` |
 
 实现：`server/rules.ts`
 
@@ -141,17 +165,19 @@
 
 | 项 | 决策 |
 |----|------|
-| 阈值 | `amount > 全体记录均值 × 5`（常量 `AMOUNT_ANOMALY_MULTIPLIER = 5`） |
+| 阈值 | `amount > 全体记录均值 × amount_anomaly_multiplier`（默认 5） |
 | 均值为 0 | 不检测 |
-| 严重程度 | `amount ≥ 均值×10` → **high**；否则 **medium** |
+| 严重程度 | `amount ≥ 均值×倍数×2` → **high**；否则 **medium** |
+| 规则 ID | `R-ANM-001` |
 
 ### 4.2 供应商集中（`vendor_concentration`）
 
 | 项 | 决策 |
 |----|------|
 | 统计范围 | 仅 **expense** 且 vendor 非空 |
-| 阈值 | 单一 vendor 支出金额占比 **> 50%**（`VENDOR_CONCENTRATION_THRESHOLD = 0.5`） |
-| 严重程度 | 占比 **≥ 70%** → **high**；否则 **medium** |
+| 阈值 | 单一 vendor 支出金额占比 **> vendor_concentration_threshold**（默认 0.5） |
+| 严重程度 | 占比 **≥ min(0.7, 阈值+0.2)** → **high**；否则 **medium** |
+| 规则 ID | `R-VEN-001` |
 
 实现：`server/anomaly.ts`
 
@@ -230,17 +256,21 @@ Prompt 要求返回 JSON：
 
 单条 LLM 失败：**跳过该条**，不影响其余高风险项与流水线。
 
-### 6.5 知识库种子
+### 6.5 知识库种子（制度条款）
 
 | 项 | 决策 |
 |----|------|
-| 条目数 | 5 条（duplicate / approval / anomaly / vendor_concentration / general） |
+| 条目数 | 8 条；报销 / 授权 / 采购制度各 ≥2 条，另含异常监控与内控通则 |
+| 结构 | 每条含 `policyName`（制度名）+ `clauseId`（条款号）+ 正文 |
+| 向量正文 | `【《制度名》条款号】` + 正文（`formatKnowledgeSeedText`） |
+| Pinecone metadata | `content`, `category`, `policyName`, `clauseId` |
+| DB 列 | `knowledge_base.policy_name` / `clause_id` |
 | 写入目标 | Pinecone + Supabase `knowledge_base` |
-| 脚本 | `npm run seed:kb` |
+| 脚本 | `npm run seed:kb`（更新制度后须重跑） |
 | ID | 固定 UUID（可重复 upsert） |
+| 引用格式 | `ruleReference` = `《{policyName}》{clauseId}`；LLM 缺省时用检索命中首条 metadata 回填 |
 
-条目正文：`server/rag.ts` → `KNOWLEDGE_SEED_ENTRIES`
-
+条目：`server/rag.ts` → `KNOWLEDGE_SEED_ENTRIES`  
 实现：`server/rag.ts`, `scripts/seed-knowledge-base.ts`
 
 ---
@@ -253,12 +283,15 @@ Prompt 要求返回 JSON：
 | `reason` 列 | 规则初判或 LLM 增强后的说明 |
 | 建议字段 | 无独立 DB 列；存 `metadata.recommendation` |
 | **证据快照** | `metadata.evidence[]`：由 `recordIndex` / `recordIndices` 对照 `state.records` 在 persist 时写入；字段含 date/type/amount/vendor/invoiceId/approvedBy 等；无索引则不写 |
-| 报告 | 每 task 一份 `audit_reports.content`（Markdown：执行摘要 / 发现项 / 风险分析 / 整改建议）；发现项可含关联凭证表 |
-| 报告导出 | 客户端下载 `.md` / 复制全文 / 打印（无服务端 PDF） |
+| **底稿归档** | persist 时写入 `metadata.workpaper`：ruleId/version/thresholds、evidence、originalReason、aiExplanation、ruleReference、recommendation、archivedAt |
+| 报告 | 每 task 一份 `audit_reports.content`（Markdown：执行摘要 / 发现项 / 风险分析 / 整改建议）；发现项含规则 ID/阈值与关联凭证表 |
+| 报告导出 | 客户端下载 `.md` / 复制全文 / 打印；导出正文追加任务号、时间戳、操作人、规则配置版本（`lib/report-export.ts`） |
+| 任务规则版本 | `audit_tasks.rule_config_version` = 运行时所用配置版本 |
 | **Executive Brief** | Dashboard 纯函数派生：风险结论、问题/高风险数、优先整改 Top3、评分解读；不另存表；不额外调 LLM |
 | task 终态 | 成功 → `completed` + `score`；解析失败 → `failed` |
+| issue 初态 | `workflow_status = pending_review` |
 
-实现：`server/audit-repository.ts`, `server/evidence.ts`, `server/brief.ts`
+实现：`server/audit-repository.ts`, `server/evidence.ts`, `server/brief.ts`, `lib/report-export.ts`
 
 ---
 
@@ -266,9 +299,13 @@ Prompt 要求返回 JSON：
 
 | 决策 | 说明 |
 |------|------|
-| 受保护路由 | `/dashboard`, `/upload`, `/report/*` |
-| `audit_tasks` | RLS：`user_id = auth.uid()` |
-| `audit_issues` / `audit_reports` | 通过所属 task 的 `user_id` 校验 |
+| 受保护路由 | `/dashboard`, `/upload`, `/report/*`, `/me`, `/settings/*` |
+| 角色 | `profiles.role`：`auditor`（默认）\| `business`；默认禁止自提权；仅 `ALLOW_DEMO_ROLE_SWITCH=true` 时「我的」页可切换 |
+| 上传 / 规则配置 | **仅 auditor**（页面重定向 + API 403）；导航对 business 隐藏 |
+| Dashboard | auditor：任务列表 + 全量 issues；business：**我的待办**（`listAssignedIssues`），不展示全量任务历史 |
+| `audit_tasks` SELECT | auditor **或** owner **或** 任务上存在分派给自己的 issue |
+| `audit_issues` | auditor 全量；business 仅 `assignee_id = auth.uid()` |
+| `audit_reports` | auditor **或** owner **或** 任务上有分派给自己的 issue |
 | `knowledge_base` | 已登录用户只读；写入仅 service_role / seed 脚本 |
 | 禁止 | 用 `user_metadata` 做授权 |
 
@@ -283,10 +320,27 @@ Prompt 要求返回 JSON：
 | 面向用户文案 | **中文** |
 | 代码/标识符 | **英文** |
 | Issue 类型展示 | duplicate→重复发票, anomaly→金额异常, approval→审批缺失, vendor_concentration→供应商集中 |
-| Dashboard 工作台 | 管理层摘要 + Issue 筛选（严重程度/类型/仅 AI）+ 行展开证据链 |
+| Dashboard 工作台 | 管理层摘要 + Issue 筛选（严重程度/类型/工单状态/仅 AI）+ 行展开证据链与工单操作 |
 | 旧任务无 evidence | UI 显示「无关联明细快照」，不报错 |
 
 实现：`components/IssueTable.tsx`, `components/IssueWorkbench.tsx`, `components/ExecutiveBrief.tsx`
+
+---
+
+## 16. Issue 工单闭环（Phase 11）
+
+| 项 | 决策 |
+|----|------|
+| 状态机 | `待复核 → 确认风险 / 误报 → 整改中 → 待验收 → 已关闭`（可重新打开为待复核；误报可直关） |
+| 轨迹 | `audit_issue_events` 记录 from/to、操作人、时间、备注 |
+| 审计角色 | 可确认/误报/分派；对「待验收」通过关闭或驳回（驳回须备注）；**不可**从整改中直关 |
+| 业务角色 | 仅可操作分派给自己的项；**仅** `remediating → pending_verification` |
+| 提交验收 | 措施/完成说明各 ≥10 字；至少 1 个附件（截图/PDF 或修正版流水）；修正文件只存证、不重跑规则 |
+| 附件 | `audit_issue_attachments` + Storage `issue-remediation`；remediating 时可删本人附件 |
+| 重新打开 | 非终态回到 `pending_review` 时须填备注 |
+| API | `PATCH /api/issues/[id]`；`GET/POST/DELETE /api/issues/[id]/attachments` |
+
+实现：`server/issue-workflow.ts`, `server/issue-attachments.ts`, `app/api/issues/[id]/route.ts`, `components/IssueWorkbench.tsx`
 
 ---
 
