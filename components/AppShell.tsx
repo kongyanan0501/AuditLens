@@ -56,7 +56,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="al-canvas flex min-h-[100dvh] bg-background">
-      <aside className="al-glass fixed inset-y-0 left-0 z-30 hidden w-60 flex-col md:flex">
+      <aside className="al-glass fixed inset-y-0 left-0 z-30 hidden w-60 flex-col print:hidden md:flex">
         <div className="relative px-5 py-6">
           <Link href="/" className="group block">
             <span className="al-brand-mark text-base">AuditLens AI</span>
@@ -101,7 +101,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="relative z-10 flex min-h-[100dvh] flex-1 flex-col md:pl-60">
-        <header className="al-glass sticky top-0 z-20 border-b border-[var(--border-subtle)]">
+        <header className="al-glass sticky top-0 z-20 border-b border-[var(--border-subtle)] print:hidden">
           <div className="flex h-14 items-center justify-between gap-4 px-4 md:px-8">
             <div className="flex min-w-0 items-center gap-3">
               <span className="text-sm font-semibold text-primary md:hidden">

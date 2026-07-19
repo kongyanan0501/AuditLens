@@ -2,7 +2,8 @@ import Link from "next/link";
 import { FileText, LayoutDashboard, Upload } from "lucide-react";
 import { AlertBanner } from "@/components/AlertBanner";
 import { EmptyState } from "@/components/EmptyState";
-import { IssueTable } from "@/components/IssueTable";
+import { ExecutiveBrief } from "@/components/ExecutiveBrief";
+import { IssueWorkbench } from "@/components/IssueWorkbench";
 import {
   PageHeader,
   PageHeaderLinkAction,
@@ -20,6 +21,7 @@ import {
   getLatestCompletedTaskBundle,
   listUserAuditTasks,
 } from "@/server/audit-queries";
+import { buildExecutiveBrief } from "@/server/brief";
 
 type DashboardPageProps = {
   searchParams: Promise<{ taskId?: string }>;
@@ -53,6 +55,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const llmCount = issues.filter(
     (issue) => issue.metadata?.llmExplained === true,
   ).length;
+  const brief = bundle
+    ? buildExecutiveBrief({ score: bundle.task.score, issues: bundle.issues })
+    : null;
 
   return (
     <section className="space-y-8">
@@ -220,12 +225,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             />
           </div>
 
+          {brief ? <ExecutiveBrief model={brief} /> : null}
+
           <div className="grid gap-6 lg:grid-cols-5">
             <div className="lg:col-span-2">
               <RiskDistributionChart issues={issues} />
             </div>
             <div className="lg:col-span-3">
-              <IssueTable issues={issues} />
+              <IssueWorkbench issues={issues} />
             </div>
           </div>
         </>

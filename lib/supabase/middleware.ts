@@ -40,9 +40,27 @@ export async function updateSession(request: NextRequest): Promise<{
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Prefer getUser() (validates with Auth API). Edge Runtime 在部分网络环境下
+  // 会 fetch failed；此时回退 getSession() 读取 Cookie，避免登录后被踢回 /login。
+  try {
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
 
-  return { supabaseResponse, user };
+    if (!error && user) {
+      return { supabaseResponse, user };
+    }
+  } catch {
+    // fall through to cookie session
+  }
+
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    return { supabaseResponse, user: session?.user ?? null };
+  } catch {
+    return { supabaseResponse, user: null };
+  }
 }

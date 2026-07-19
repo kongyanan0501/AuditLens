@@ -66,9 +66,39 @@ describe("buildDeterministicReport", () => {
         },
       ],
       anomalies: [],
+      records: [],
     });
 
     assert.match(section, /审批缺失/);
     assert.match(section, /缺少审批/);
+  });
+
+  it("includes evidence table when metadata has evidence", () => {
+    const section = buildFindingsSection({
+      issues: [
+        {
+          type: "duplicate",
+          severity: "high",
+          reason: "重复发票",
+          metadata: {
+            evidence: [
+              {
+                date: "2025-03-13",
+                type: "expense",
+                amount: 6000,
+                vendor: "华信",
+                invoiceId: "INV-0088",
+                approvedBy: "王强",
+              },
+            ],
+          },
+        },
+      ],
+      anomalies: [],
+      records: [],
+    });
+
+    assert.match(section, /关联凭证/);
+    assert.match(section, /INV-0088/);
   });
 });

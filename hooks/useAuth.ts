@@ -18,10 +18,16 @@ export function useAuth() {
       return;
     }
 
-    supabase.auth.getUser().then(({ data: { user: currentUser } }) => {
-      setUser(currentUser);
-      setLoading(false);
-    });
+    void supabase.auth
+      .getUser()
+      .then(({ data: { user: currentUser } }) => {
+        setUser(currentUser);
+        setLoading(false);
+      })
+      .catch(() => {
+        setUser(null);
+        setLoading(false);
+      });
 
     const {
       data: { subscription },
@@ -34,12 +40,24 @@ export function useAuth() {
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    const supabase = getSupabaseBrowserClient();
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error: error as AuthError | null };
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      return { error: error as AuthError | null };
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to fetch";
+      return {
+        error: {
+          name: "AuthRetryableFetchError",
+          message,
+          status: 0,
+        } as AuthError,
+      };
+    }
   }, []);
 
   const signOut = useCallback(async () => {

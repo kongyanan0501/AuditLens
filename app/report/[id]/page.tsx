@@ -2,6 +2,7 @@ import { AlertCircle } from "lucide-react";
 import { AlertBanner } from "@/components/AlertBanner";
 import { IssueTable } from "@/components/IssueTable";
 import { PageHeader } from "@/components/PageHeader";
+import { ReportActions } from "@/components/ReportActions";
 import { ReportViewer } from "@/components/ReportViewer";
 import { RiskScoreCard } from "@/components/RiskScoreCard";
 import { createClient } from "@/lib/supabase/server";
@@ -71,6 +72,14 @@ export default async function ReportPage({ params }: ReportPageProps) {
           }
         />
       </div>
+
+      {bundle.report?.content ? (
+        <ReportActions
+          content={bundle.report.content}
+          taskId={bundle.task.id}
+          fileName={bundle.task.fileName}
+        />
+      ) : null}
 
       <ReportViewer content={bundle.report?.content ?? null} />
       <IssueTable issues={bundle.issues} />

@@ -34,15 +34,20 @@ export async function createClient() {
 
 /** Returns the authenticated user or null. Prefer getUser() over getSession(). */
 export async function getAuthUser() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
 
-  if (error) {
+    if (error) {
+      return null;
+    }
+
+    return user;
+  } catch {
+    // Offline / DNS / unreachable Supabase project
     return null;
   }
-
-  return user;
 }

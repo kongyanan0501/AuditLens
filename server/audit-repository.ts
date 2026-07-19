@@ -1,8 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { withEvidenceMetadata } from "@/server/evidence";
 import type {
   AuditAnomaly,
   AuditGraphState,
   AuditIssue,
+  AuditRecord,
 } from "@/types/audit";
 import type { Database, Json } from "@/types/database";
 
@@ -12,26 +14,43 @@ function toJsonMetadata(metadata: Record<string, unknown> | undefined): Json {
   return (metadata ?? {}) as Json;
 }
 
-function anomalyToIssueRow(taskId: string, anomaly: AuditAnomaly) {
+function anomalyToIssueRow(
+  taskId: string,
+  anomaly: AuditAnomaly,
+  records: AuditRecord[],
+) {
+  const metadata = withEvidenceMetadata(records, {
+    recordIndex: anomaly.recordIndex,
+    metadata: {
+      ...anomaly.metadata,
+      recordIndex: anomaly.recordIndex,
+    },
+  });
+
   return {
     task_id: taskId,
     type: anomaly.type,
     severity: anomaly.severity,
     reason: anomaly.reason,
-    metadata: toJsonMetadata({
-      ...anomaly.metadata,
-      recordIndex: anomaly.recordIndex,
-    }),
+    metadata: toJsonMetadata(metadata),
   };
 }
 
-function issueToRow(taskId: string, issue: AuditIssue) {
+function issueToRow(
+  taskId: string,
+  issue: AuditIssue,
+  records: AuditRecord[],
+) {
+  const metadata = withEvidenceMetadata(records, {
+    metadata: issue.metadata,
+  });
+
   return {
     task_id: taskId,
     type: issue.type,
     severity: issue.severity,
     reason: issue.reason,
-    metadata: toJsonMetadata(issue.metadata),
+    metadata: toJsonMetadata(metadata),
   };
 }
 
@@ -84,8 +103,10 @@ export async function persistAuditResults(
   state: AuditGraphState,
 ): Promise<void> {
   const issueRows = [
-    ...state.issues.map((issue) => issueToRow(taskId, issue)),
-    ...state.anomalies.map((anomaly) => anomalyToIssueRow(taskId, anomaly)),
+    ...state.issues.map((issue) => issueToRow(taskId, issue, state.records)),
+    ...state.anomalies.map((anomaly) =>
+      anomalyToIssueRow(taskId, anomaly, state.records),
+    ),
   ];
 
   if (issueRows.length > 0) {

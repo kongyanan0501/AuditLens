@@ -5,10 +5,13 @@ import {
   type LLMProvider,
 } from "@/lib/ai-provider";
 import { getRiskLabel } from "@/lib/theme";
+import { buildEvidenceSnapshot } from "@/server/evidence";
 import type {
   AuditAnomaly,
   AuditGraphState,
   AuditIssue,
+  AuditRecord,
+  EvidenceRow,
   IssueSeverity,
   IssueType,
 } from "@/types/audit";
@@ -47,15 +50,103 @@ function formatRecommendation(item: ReportItem): string | undefined {
   return typeof recommendation === "string" ? recommendation : undefined;
 }
 
-function formatFindingLine(index: number, item: ReportItem): string {
-  const label = TYPE_LABELS[item.type];
+function parseEvidenceFromMetadata(
+  metadata: Record<string, unknown> | undefined,
+): EvidenceRow[] {
+  const raw = metadata?.evidence;
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") {
+      return [];
+    }
+    const row = entry as Record<string, unknown>;
+    if (
+      typeof row.date !== "string" ||
+      (row.type !== "income" && row.type !== "expense") ||
+      typeof row.amount !== "number" ||
+      typeof row.vendor !== "string" ||
+      typeof row.invoiceId !== "string"
+    ) {
+      return [];
+    }
+    return [
+      {
+        date: row.date,
+        type: row.type,
+        amount: row.amount,
+        vendor: row.vendor,
+        invoiceId: row.invoiceId,
+        ...(typeof row.department === "string"
+          ? { department: row.department }
+          : {}),
+        ...(typeof row.region === "string" ? { region: row.region } : {}),
+        ...(typeof row.approvedBy === "string"
+          ? { approvedBy: row.approvedBy }
+          : {}),
+      },
+    ];
+  });
+}
+
+export function formatEvidenceMarkdown(evidence: EvidenceRow[]): string {
+  if (evidence.length === 0) {
+    return "";
+  }
+
+  const header = [
+    "   - 关联凭证：",
+    "     | 日期 | 类型 | 金额 | 供应商 | 发票号 | 审批人 |",
+    "     | --- | --- | --- | --- | --- | --- |",
+  ];
+
+  const rows = evidence.map((row) => {
+    const typeLabel = row.type === "expense" ? "支出" : "收入";
+    const approvedBy = row.approvedBy?.trim() || "—";
+    return `     | ${row.date} | ${typeLabel} | ${row.amount} | ${row.vendor} | ${row.invoiceId} | ${approvedBy} |`;
+  });
+
+  return [...header, ...rows].join("\n");
+}
+
+function resolveEvidence(
+  item: ReportItem,
+  records: AuditRecord[],
+): EvidenceRow[] {
+  const fromMeta = parseEvidenceFromMetadata(item.metadata);
+  if (fromMeta.length > 0) {
+    return fromMeta;
+  }
+
+  const recordIndex =
+    "recordIndex" in item && typeof item.recordIndex === "number"
+      ? item.recordIndex
+      : undefined;
+
+  return buildEvidenceSnapshot(records, {
+    recordIndex,
+    metadata: item.metadata,
+  });
+}
+
+function formatFindingLine(
+  index: number,
+  item: ReportItem,
+  records: AuditRecord[],
+): string {
   const severity = SEVERITY_LABELS[item.severity];
   const recommendation = formatRecommendation(item);
-  const lines = [
-    `${index}. **[${severity}]** ${item.reason}`,
-  ];
+  const evidenceMarkdown = formatEvidenceMarkdown(
+    resolveEvidence(item, records),
+  );
+  const lines = [`${index}. **[${severity}]** ${item.reason}`];
   if (recommendation) {
     lines.push(`   - 建议：${recommendation}`);
+  }
+  if (evidenceMarkdown) {
+    lines.push(evidenceMarkdown);
   }
   return lines.join("\n");
 }
@@ -71,19 +162,20 @@ function groupFindingsByType(items: ReportItem[]): Map<IssueType, ReportItem[]> 
 }
 
 export function buildFindingsSection(
-  state: Pick<AuditGraphState, "issues" | "anomalies">,
+  state: Pick<AuditGraphState, "issues" | "anomalies" | "records">,
 ): string {
   const items = allReportItems(state);
   if (items.length === 0) {
     return "本次审计未发现规则命中或统计异常。";
   }
 
+  const records = state.records ?? [];
   const groups = groupFindingsByType(items);
   const sections: string[] = [];
 
   for (const [type, groupItems] of groups) {
     const lines = groupItems.map((item, index) =>
-      formatFindingLine(index + 1, item),
+      formatFindingLine(index + 1, item, records),
     );
     sections.push(
       `### ${TYPE_LABELS[type]}（${groupItems.length} 项）\n\n${lines.join("\n")}`,

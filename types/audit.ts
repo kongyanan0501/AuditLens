@@ -26,6 +26,18 @@ export type IssueType =
 
 export type IssueSeverity = "low" | "medium" | "high";
 
+/** Snapshot of a related ledger row stored on issue metadata for evidence UI */
+export type EvidenceRow = {
+  date: string;
+  type: "income" | "expense";
+  amount: number;
+  vendor: string;
+  invoiceId: string;
+  department?: string;
+  region?: string;
+  approvedBy?: string;
+};
+
 /** Rule or anomaly finding before persistence */
 export type AuditIssue = {
   id?: string;

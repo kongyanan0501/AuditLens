@@ -50,6 +50,7 @@
 
 | 日期 | 摘要 | 模块 |
 |------|------|------|
+| 2026-07-19 | 企业 Demo 包：`metadata.evidence` 快照、Executive Brief、Issue 工作台筛选/展开、报告客户端导出 | `server/evidence.ts`, `server/brief.ts`, `components/IssueWorkbench.tsx`, `components/ReportActions.tsx` |
 | 2026-06-22 | Phase 9：上传校验共享化、加载/错误/空态、README Demo 指南 | `lib/upload-constraints.ts`, `app/*/loading.tsx`, `README.md` |
 | 2026-06-21 | Phase 8：ReportGeneration 结构化报告、Dashboard 任务列表与风险分布图、Upload 全链路 | `server/report.ts`, `app/dashboard/page.tsx` |
 | 2026-06-21 | 新增 `AI_PROVIDER=qwen`（DashScope chat + embed），RAG/seed 支持 `DASHSCOPE_API_KEY` | `lib/ai-provider.ts`, `server/rag.ts`, `scripts/seed-knowledge-base.ts` |
@@ -225,6 +226,7 @@ Prompt 要求返回 JSON：
 | `metadata.ruleReference` | 政策引用 |
 | `metadata.recommendation` | 整改建议 |
 | `metadata.llmExplained` | `true` |
+| `metadata.evidence` | 关联凭证快照（见 §7） |
 
 单条 LLM 失败：**跳过该条**，不影响其余高风险项与流水线。
 
@@ -250,10 +252,13 @@ Prompt 要求返回 JSON：
 | issues 来源 | `state.issues` + `state.anomalies` 均写入 `audit_issues` |
 | `reason` 列 | 规则初判或 LLM 增强后的说明 |
 | 建议字段 | 无独立 DB 列；存 `metadata.recommendation` |
-| 报告 | 每 task 一份 `audit_reports.content`（Markdown：执行摘要 / 发现项 / 风险分析 / 整改建议） |
+| **证据快照** | `metadata.evidence[]`：由 `recordIndex` / `recordIndices` 对照 `state.records` 在 persist 时写入；字段含 date/type/amount/vendor/invoiceId/approvedBy 等；无索引则不写 |
+| 报告 | 每 task 一份 `audit_reports.content`（Markdown：执行摘要 / 发现项 / 风险分析 / 整改建议）；发现项可含关联凭证表 |
+| 报告导出 | 客户端下载 `.md` / 复制全文 / 打印（无服务端 PDF） |
+| **Executive Brief** | Dashboard 纯函数派生：风险结论、问题/高风险数、优先整改 Top3、评分解读；不另存表；不额外调 LLM |
 | task 终态 | 成功 → `completed` + `score`；解析失败 → `failed` |
 
-实现：`server/audit-repository.ts`
+实现：`server/audit-repository.ts`, `server/evidence.ts`, `server/brief.ts`
 
 ---
 
@@ -278,8 +283,10 @@ Prompt 要求返回 JSON：
 | 面向用户文案 | **中文** |
 | 代码/标识符 | **英文** |
 | Issue 类型展示 | duplicate→重复发票, anomaly→金额异常, approval→审批缺失, vendor_concentration→供应商集中 |
+| Dashboard 工作台 | 管理层摘要 + Issue 筛选（严重程度/类型/仅 AI）+ 行展开证据链 |
+| 旧任务无 evidence | UI 显示「无关联明细快照」，不报错 |
 
-实现：`components/IssueTable.tsx`
+实现：`components/IssueTable.tsx`, `components/IssueWorkbench.tsx`, `components/ExecutiveBrief.tsx`
 
 ---
 

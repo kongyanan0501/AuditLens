@@ -22,14 +22,34 @@ export function LoginForm() {
     const { error: signInError } = await signIn(email.trim(), password);
 
     if (signInError) {
-      setError("登录失败，请检查邮箱和密码。");
+      const message = signInError.message.toLowerCase();
+      if (
+        message.includes("fetch") ||
+        message.includes("network") ||
+        message.includes("failed to fetch")
+      ) {
+        setError(
+          "无法连接 Supabase。请检查 .env.local 中的 NEXT_PUBLIC_SUPABASE_URL 是否有效（项目是否已暂停/删除），以及本机网络。",
+        );
+      } else if (
+        message.includes("invalid login") ||
+        message.includes("invalid credentials")
+      ) {
+        setError("登录失败，请检查邮箱和密码。");
+      } else {
+        setError(`登录失败：${signInError.message}`);
+      }
       setSubmitting(false);
       return;
     }
 
+    // 硬跳转确保 Auth Cookie 写入后再进受保护路由，避免中间件读到空会话
     const redirectTo = searchParams.get("redirectTo") ?? "/dashboard";
-    router.push(redirectTo);
-    router.refresh();
+    const safePath =
+      redirectTo.startsWith("/") && !redirectTo.startsWith("//")
+        ? redirectTo
+        : "/dashboard";
+    window.location.assign(safePath);
   }
 
   return (
