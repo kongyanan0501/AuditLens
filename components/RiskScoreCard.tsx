@@ -56,7 +56,7 @@ export function RiskScoreCard({
     <div
       className={cn(
         "al-panel al-panel-interactive relative overflow-hidden",
-        featured && "al-panel-glow md:col-span-2",
+        featured && "al-panel-glow",
         variantStyles[resolvedVariant],
       )}
     >

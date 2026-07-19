@@ -90,7 +90,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   }
 
   const [recentTasks, bundleFromQuery] = await Promise.all([
-    listUserAuditTasks(supabase, user.id, 8),
+    listUserAuditTasks(supabase, user.id, 5),
     taskId
       ? getAuditTaskBundle(supabase, taskId, user.id, role)
       : getLatestCompletedTaskBundle(supabase, user.id, role),
@@ -280,20 +280,15 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
           {brief ? <ExecutiveBrief model={brief} /> : null}
 
-          <div className="grid gap-6 lg:grid-cols-5">
-            <div className="lg:col-span-2">
-              <RiskDistributionChart issues={issues} />
-            </div>
-            <div className="lg:col-span-3">
-              <IssueWorkbench
-                key={bundle.task.id}
-                taskId={bundle.task.id}
-                issues={issues}
-                role={role}
-                currentUserId={user.id}
-              />
-            </div>
-          </div>
+          <IssueWorkbench
+            key={bundle.task.id}
+            taskId={bundle.task.id}
+            issues={issues}
+            role={role}
+            currentUserId={user.id}
+          />
+
+          <RiskDistributionChart issues={issues} />
         </>
       ) : recentTasks.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
