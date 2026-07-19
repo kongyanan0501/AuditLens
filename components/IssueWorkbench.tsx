@@ -23,6 +23,8 @@ type IssueWorkbenchProps = {
   issues: AuditIssue[];
   role: UserRole;
   currentUserId: string;
+  /** When set, auditors assign the whole task to one business owner. */
+  taskId?: string;
 };
 
 const severityLabels: Record<IssueSeverity, string> = {
@@ -111,7 +113,6 @@ function IssueWorkflowControls({
   onUpdated: (patch: Partial<AuditIssue>) => void;
 }) {
   const [note, setNote] = useState("");
-  const [assigneeId, setAssigneeId] = useState(issue.assigneeId ?? "");
   const [remediationAction, setRemediationAction] = useState(
     issue.remediationAction ?? "",
   );
@@ -168,10 +169,7 @@ function IssueWorkflowControls({
             { label: "标为误报", toStatus: "false_positive" },
           ]
         : status === "confirmed"
-          ? [
-              { label: "分派整改", toStatus: "remediating" },
-              { label: "直接关闭", toStatus: "closed" },
-            ]
+          ? [{ label: "直接关闭", toStatus: "closed" }]
           : status === "false_positive"
             ? [
                 { label: "关闭误报", toStatus: "closed" },
@@ -202,13 +200,6 @@ function IssueWorkflowControls({
         body: JSON.stringify({
           toStatus,
           note: note.trim() || undefined,
-          assigneeId:
-            role === "auditor"
-              ? assigneeId.trim() ||
-                (toStatus === "remediating" && status === "confirmed"
-                  ? currentUserId
-                  : undefined)
-              : undefined,
           remediationAction: extra?.remediationAction,
           remediationResult: extra?.remediationResult,
         }),
@@ -217,6 +208,7 @@ function IssueWorkflowControls({
         data?: {
           workflowStatus: IssueWorkflowStatus;
           assigneeId: string | null;
+          assigneeEmail: string | null;
           resolutionNote: string | null;
           statusUpdatedAt: string | null;
           statusUpdatedBy: string | null;
@@ -234,6 +226,7 @@ function IssueWorkflowControls({
       onUpdated({
         workflowStatus: json.data.workflowStatus,
         assigneeId: json.data.assigneeId,
+        assigneeEmail: json.data.assigneeEmail,
         resolutionNote: json.data.resolutionNote,
         statusUpdatedAt: json.data.statusUpdatedAt,
         statusUpdatedBy: json.data.statusUpdatedBy,
@@ -324,9 +317,9 @@ function IssueWorkflowControls({
         <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">
           {workflowLabels[status]}
         </span>
-        {issue.assigneeId ? (
+        {issue.assigneeEmail || issue.assigneeId ? (
           <span className="text-muted-foreground">
-            分派：{issue.assigneeId.slice(0, 8)}…
+            分派：{issue.assigneeEmail ?? "（邮箱未知）"}
           </span>
         ) : null}
       </div>
@@ -442,18 +435,6 @@ function IssueWorkflowControls({
         </div>
       ) : null}
 
-      {role === "auditor" && status !== "pending_verification" ? (
-        <label className="block space-y-1 text-xs">
-          <span className="text-muted-foreground">分派给（用户 UUID）</span>
-          <input
-            className="w-full rounded-md border border-[var(--border-subtle)] bg-background px-2 py-1.5 text-xs"
-            value={assigneeId}
-            onChange={(event) => setAssigneeId(event.target.value)}
-            placeholder="业务用户 ID，可从「我的」页复制"
-          />
-        </label>
-      ) : null}
-
       {role === "auditor" || (!showRemediationForm && role === "business") ? (
         <label className="block space-y-1 text-xs">
           <span className="text-muted-foreground">
@@ -523,10 +504,112 @@ function IssueWorkflowControls({
   );
 }
 
+function ProjectAssignBar({
+  taskId,
+  issues,
+  onAssigned,
+}: {
+  taskId: string;
+  issues: AuditIssue[];
+  onAssigned: (
+    patches: Array<{
+      id: string;
+      workflowStatus: IssueWorkflowStatus;
+      assigneeId: string | null;
+      assigneeEmail: string | null;
+    }>,
+  ) => void;
+}) {
+  const existingEmail =
+    issues.find((issue) => issue.assigneeEmail)?.assigneeEmail ?? "";
+  const [assigneeEmail, setAssigneeEmail] = useState(existingEmail);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const confirmableCount = issues.filter(
+    (issue) => (issue.workflowStatus ?? "pending_review") === "confirmed",
+  ).length;
+  const remediatingCount = issues.filter(
+    (issue) => (issue.workflowStatus ?? "pending_review") === "remediating",
+  ).length;
+
+  const assignProject = () => {
+    setError(null);
+    setSuccess(null);
+    startTransition(async () => {
+      const response = await fetch(`/api/tasks/${taskId}/assign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          assigneeEmail: assigneeEmail.trim(),
+        }),
+      });
+      const json = (await response.json()) as {
+        data?: {
+          assigneeEmail: string;
+          assignedCount: number;
+          skippedCount: number;
+          issues: Array<{
+            id: string;
+            workflowStatus: IssueWorkflowStatus;
+            assigneeId: string | null;
+            assigneeEmail: string | null;
+          }>;
+        };
+        error?: string;
+      };
+      if (!response.ok || !json.data) {
+        setError(json.error ?? "分派失败");
+        return;
+      }
+      onAssigned(json.data.issues);
+      setAssigneeEmail(json.data.assigneeEmail);
+      setSuccess(
+        json.data.assignedCount > 0
+          ? `已分派 ${json.data.assignedCount} 项给 ${json.data.assigneeEmail}`
+          : `对接人已是 ${json.data.assigneeEmail}`,
+      );
+    });
+  };
+
+  return (
+    <div className="space-y-2 border-b border-[var(--border-subtle)] bg-muted/20 px-5 py-3">
+      <p className="text-xs text-muted-foreground">
+        项目整改对接：整包分派给一名业务人员（已确认风险{" "}
+        {confirmableCount} · 整改中 {remediatingCount}）
+      </p>
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="min-w-[220px] flex-1 space-y-1 text-xs">
+          <span className="text-muted-foreground">业务对接人邮箱</span>
+          <input
+            className="w-full rounded-md border border-[var(--border-subtle)] bg-background px-2 py-1.5 text-xs"
+            type="email"
+            value={assigneeEmail}
+            onChange={(event) => setAssigneeEmail(event.target.value)}
+            placeholder="业务账号邮箱"
+          />
+        </label>
+        <Button
+          type="button"
+          size="sm"
+          disabled={pending || !assigneeEmail.trim()}
+          onClick={assignProject}
+        >
+          分派本项目
+        </Button>
+      </div>
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      {success ? <p className="text-xs text-primary">{success}</p> : null}
+    </div>
+  );
+}
+
 export function IssueWorkbench({
   issues: initialIssues,
   role,
   currentUserId,
+  taskId,
 }: IssueWorkbenchProps) {
   const [issues, setIssues] = useState(initialIssues);
   const [severityFilter, setSeverityFilter] = useState<"all" | IssueSeverity>(
@@ -566,10 +649,33 @@ export function IssueWorkbench({
         title="问题工作台"
         description={
           role === "business"
-            ? "仅显示分派给你的问题；可推进整改并关闭"
-            : "筛选、复核、分派整改，并展开凭证证据链"
+            ? "仅显示分派给你的问题；可提交整改验收"
+            : "筛选、复核问题；确认风险后整包分派给一名业务对接人"
         }
       />
+
+      {role === "auditor" && taskId ? (
+        <ProjectAssignBar
+          taskId={taskId}
+          issues={issues}
+          onAssigned={(patches) => {
+            const byId = new Map(patches.map((item) => [item.id, item]));
+            setIssues((current) =>
+              current.map((row) => {
+                if (!row.id) return row;
+                const patch = byId.get(row.id);
+                if (!patch) return row;
+                return {
+                  ...row,
+                  workflowStatus: patch.workflowStatus,
+                  assigneeId: patch.assigneeId,
+                  assigneeEmail: patch.assigneeEmail,
+                };
+              }),
+            );
+          }}
+        />
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border-subtle)] px-5 py-3">
         <select

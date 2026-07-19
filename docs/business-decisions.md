@@ -51,6 +51,8 @@
 
 | 日期 | 摘要 | 模块 |
 |------|------|------|
+| 2026-07-19 | 整改分派改为**项目级**：一任务一名业务对接人；`POST /api/tasks/[id]/assign` 批量写入 issue.assignee | `server/issue-workflow.ts`, `components/IssueWorkbench.tsx` |
+| 2026-07-19 | 分派改用业务用户邮箱（库内仍存 UUID）；工作台展示邮箱 | `server/profiles.ts`, `components/IssueWorkbench.tsx` |
 | 2026-07-19 | 线上整改验收：业务提交说明+附件→待验收；审计通过关闭/驳回；禁止业务直关 | `server/issue-workflow.ts`, `server/issue-attachments.ts`, `supabase/migrations/20260719100000_online_remediation.sql` |
 | 2026-07-19 | 修复业务角色 Dashboard RLS 无限递归（`42P17`）：跨表可见性改 SECURITY DEFINER 函数 | `supabase/migrations/20260719030000_phase11_fix_rls_recursion.sql` |
 | 2026-07-19 | Phase 11 验收修补：auditor RLS 全量、业务 Dashboard「我的待办」、制度种子≥2/类、`《制度》条款` 引用、规则变更历史、非法流转 409 | `supabase/migrations/20260719020000_phase11_rls_auditor_scope.sql`, `app/dashboard/page.tsx`, `server/rag.ts`, `server/rule-config.ts` |
@@ -320,7 +322,7 @@ Prompt 要求返回 JSON：
 | 面向用户文案 | **中文** |
 | 代码/标识符 | **英文** |
 | Issue 类型展示 | duplicate→重复发票, anomaly→金额异常, approval→审批缺失, vendor_concentration→供应商集中 |
-| Dashboard 工作台 | 管理层摘要 + Issue 筛选（严重程度/类型/工单状态/仅 AI）+ 行展开证据链与工单操作 |
+| Dashboard 工作台 | 管理层摘要 + 项目级分派条 + Issue 筛选（严重程度/类型/工单状态/仅 AI）+ 行展开证据链与工单操作 |
 | 旧任务无 evidence | UI 显示「无关联明细快照」，不报错 |
 
 实现：`components/IssueTable.tsx`, `components/IssueWorkbench.tsx`, `components/ExecutiveBrief.tsx`
@@ -333,14 +335,17 @@ Prompt 要求返回 JSON：
 |----|------|
 | 状态机 | `待复核 → 确认风险 / 误报 → 整改中 → 待验收 → 已关闭`（可重新打开为待复核；误报可直关） |
 | 轨迹 | `audit_issue_events` 记录 from/to、操作人、时间、备注 |
-| 审计角色 | 可确认/误报/分派；对「待验收」通过关闭或驳回（驳回须备注）；**不可**从整改中直关 |
+| 审计角色 | 可确认/误报；项目级分派整改；对「待验收」通过关闭或驳回（驳回须备注）；**不可**从整改中直关 |
+| 分派粒度 | **任务级**：一项目一名业务对接人；不按问题逐条分派（UI 主路径） |
+| 分派范围 | `confirmed` → `remediating` + assignee；已在 `remediating` 的可改对接人；其余状态跳过 |
+| 分派标识 | UI/API 使用**邮箱**；对象须为 `profiles.role = business`；库内仍存 `assignee_id` UUID |
 | 业务角色 | 仅可操作分派给自己的项；**仅** `remediating → pending_verification` |
 | 提交验收 | 措施/完成说明各 ≥10 字；至少 1 个附件（截图/PDF 或修正版流水）；修正文件只存证、不重跑规则 |
 | 附件 | `audit_issue_attachments` + Storage `issue-remediation`；remediating 时可删本人附件 |
 | 重新打开 | 非终态回到 `pending_review` 时须填备注 |
-| API | `PATCH /api/issues/[id]`；`GET/POST/DELETE /api/issues/[id]/attachments` |
+| API | `POST /api/tasks/[id]/assign`（项目分派）；`PATCH /api/issues/[id]`；`GET/POST/DELETE /api/issues/[id]/attachments` |
 
-实现：`server/issue-workflow.ts`, `server/issue-attachments.ts`, `app/api/issues/[id]/route.ts`, `components/IssueWorkbench.tsx`
+实现：`server/issue-workflow.ts`, `server/issue-attachments.ts`, `app/api/tasks/[id]/assign/route.ts`, `app/api/issues/[id]/route.ts`, `components/IssueWorkbench.tsx`
 
 ---
 

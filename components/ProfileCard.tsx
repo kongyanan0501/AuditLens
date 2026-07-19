@@ -48,19 +48,18 @@ export function ProfileCard() {
     <div className="space-y-6">
       <Panel className="p-6">
         <dl className="grid gap-5 sm:grid-cols-2">
-          <div>
+          <div className="sm:col-span-2">
             <dt className="al-label">邮箱</dt>
-            <dd className="mt-1 text-base">{user.email ?? "暂无"}</dd>
+            <dd className="mt-1 break-all text-base">
+              {user.email ?? "暂无"}
+            </dd>
+            <p className="mt-1 text-xs text-muted-foreground">
+              审计分派整改时填写此邮箱
+            </p>
           </div>
           <div>
             <dt className="al-label">注册时间</dt>
             <dd className="mt-1 text-base">{formatDate(user.created_at)}</dd>
-          </div>
-          <div className="sm:col-span-2">
-            <dt className="al-label">用户 ID</dt>
-            <dd className="al-metric mt-1 break-all text-sm text-foreground/80">
-              {user.id}
-            </dd>
           </div>
           <div>
             <dt className="al-label">上次登录</dt>

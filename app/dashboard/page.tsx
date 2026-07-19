@@ -75,7 +75,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             <EmptyState
               icon={LayoutDashboard}
               title="暂无分派事项"
-              description="等待审计人员确认风险并分派整改后，相关问题将出现在此。"
+              description="等待审计人员确认风险并分派本项目后，相关问题将出现在此。"
             />
           </Panel>
         ) : (
@@ -287,6 +287,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             <div className="lg:col-span-3">
               <IssueWorkbench
                 key={bundle.task.id}
+                taskId={bundle.task.id}
                 issues={issues}
                 role={role}
                 currentUserId={user.id}

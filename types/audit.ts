@@ -101,6 +101,8 @@ export type AuditIssue = {
   metadata?: Record<string, unknown>;
   workflowStatus?: IssueWorkflowStatus;
   assigneeId?: string | null;
+  /** Display / assign-by-email; not a DB column */
+  assigneeEmail?: string | null;
   resolutionNote?: string | null;
   statusUpdatedAt?: string | null;
   statusUpdatedBy?: string | null;

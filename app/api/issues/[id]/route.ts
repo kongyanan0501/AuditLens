@@ -28,7 +28,9 @@ function errorStatus(message: string): number {
     message.includes("至少") ||
     message.includes("仅") ||
     message.includes("无效") ||
-    message.includes("不能")
+    message.includes("不能") ||
+    message.includes("未找到") ||
+    message.includes("邮箱")
   ) {
     return 400;
   }
@@ -92,6 +94,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const body = (await request.json()) as {
       toStatus?: unknown;
       note?: unknown;
+      assigneeEmail?: unknown;
       assigneeId?: unknown;
       remediationAction?: unknown;
       remediationResult?: unknown;
@@ -111,6 +114,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       actorRole: role,
       toStatus: body.toStatus,
       note: typeof body.note === "string" ? body.note : undefined,
+      assigneeEmail:
+        body.assigneeEmail === null
+          ? null
+          : typeof body.assigneeEmail === "string"
+            ? body.assigneeEmail
+            : undefined,
       assigneeId:
         body.assigneeId === null
           ? null

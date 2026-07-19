@@ -1,6 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { countIssueAttachments } from "@/server/issue-attachments";
+import {
+  getEmailsByUserIds,
+  getUserRole,
+  resolveAssigneeUserId,
+} from "@/server/profiles";
 import type {
   IssueWorkflowEvent,
   IssueWorkflowStatus,
@@ -72,6 +77,8 @@ export type TransitionIssueInput = {
   actorRole: UserRole;
   toStatus: IssueWorkflowStatus;
   note?: string;
+  /** Preferred: business user email. Legacy UUID still accepted. */
+  assigneeEmail?: string | null;
   assigneeId?: string | null;
   remediationAction?: string;
   remediationResult?: string;
@@ -81,6 +88,7 @@ export type TransitionIssueResult = {
   id: string;
   workflowStatus: IssueWorkflowStatus;
   assigneeId: string | null;
+  assigneeEmail: string | null;
   resolutionNote: string | null;
   statusUpdatedAt: string | null;
   statusUpdatedBy: string | null;
@@ -202,15 +210,22 @@ export async function transitionIssue(
   }
 
   let nextAssignee = issue.assignee_id;
-  if (input.assigneeId !== undefined) {
+  const assigneeInput =
+    input.assigneeEmail !== undefined
+      ? input.assigneeEmail
+      : input.assigneeId !== undefined
+        ? input.assigneeId
+        : undefined;
+
+  if (assigneeInput !== undefined) {
     if (input.actorRole !== "auditor" && !isTaskOwner) {
       throw new Error("仅审计角色可分派问题");
     }
-    nextAssignee = input.assigneeId;
+    nextAssignee = await resolveAssigneeUserId(assigneeInput);
   }
 
   if (input.toStatus === "remediating" && fromStatus === "confirmed" && !nextAssignee) {
-    throw new Error("进入整改中前须指定分派人（填写用户 UUID）");
+    throw new Error("进入整改中前须指定分派人（填写业务用户邮箱）");
   }
 
   const note = input.note?.trim() || null;
@@ -294,10 +309,17 @@ export async function transitionIssue(
     console.warn("[issue-workflow] event insert failed:", dbMessage(eventError));
   }
 
+  const emailMap = updated.assignee_id
+    ? await getEmailsByUserIds([updated.assignee_id])
+    : new Map<string, string>();
+
   return {
     id: updated.id,
     workflowStatus: updated.workflow_status as IssueWorkflowStatus,
     assigneeId: updated.assignee_id,
+    assigneeEmail: updated.assignee_id
+      ? (emailMap.get(updated.assignee_id) ?? null)
+      : null,
     resolutionNote: updated.resolution_note,
     statusUpdatedAt: updated.status_updated_at,
     statusUpdatedBy: updated.status_updated_by,
@@ -305,5 +327,189 @@ export async function transitionIssue(
     remediationResult: updated.remediation_result,
     remediationSubmittedAt: updated.remediation_submitted_at,
     remediationSubmittedBy: updated.remediation_submitted_by,
+  };
+}
+
+export type AssignTaskRemediationInput = {
+  taskId: string;
+  actorId: string;
+  actorRole: UserRole;
+  assigneeEmail: string;
+  note?: string;
+};
+
+export type AssignTaskRemediationResult = {
+  taskId: string;
+  assigneeId: string;
+  assigneeEmail: string;
+  assignedCount: number;
+  skippedCount: number;
+  issues: Array<{
+    id: string;
+    workflowStatus: IssueWorkflowStatus;
+    assigneeId: string | null;
+    assigneeEmail: string | null;
+  }>;
+};
+
+/**
+ * Project-level assign: one business owner for the whole task.
+ * - confirmed → remediating + assignee
+ * - remediating → update assignee (reassign)
+ * Other statuses are skipped (pending_review / verification / closed / false_positive).
+ */
+export async function assignTaskRemediation(
+  _supabase: DbClient,
+  input: AssignTaskRemediationInput,
+): Promise<AssignTaskRemediationResult> {
+  void _supabase;
+  const admin = createAdminClient();
+
+  const { data: task, error: taskError } = await admin
+    .from("audit_tasks")
+    .select("id, user_id")
+    .eq("id", input.taskId)
+    .maybeSingle();
+
+  if (taskError) {
+    throwDb(taskError, "读取任务");
+  }
+  if (!task) {
+    throw new Error("任务不存在或无权访问");
+  }
+
+  const isTaskOwner = task.user_id === input.actorId;
+  if (input.actorRole !== "auditor" && !isTaskOwner) {
+    throw new Error("仅审计角色可分派项目");
+  }
+
+  const assigneeId = await resolveAssigneeUserId(input.assigneeEmail.trim());
+  if (!assigneeId) {
+    throw new Error("须指定业务用户邮箱");
+  }
+
+  const assigneeRole = await getUserRole(admin, assigneeId);
+  if (assigneeRole !== "business") {
+    throw new Error("分派对象须为业务角色用户（请在对方「我的」页确认角色）");
+  }
+
+  const emailMap = await getEmailsByUserIds([assigneeId]);
+  const assigneeEmail = emailMap.get(assigneeId) ?? input.assigneeEmail.trim();
+
+  const { data: issueRows, error: issuesError } = await admin
+    .from("audit_issues")
+    .select("id, workflow_status, assignee_id")
+    .eq("task_id", input.taskId)
+    .order("created_at", { ascending: true });
+
+  if (issuesError) {
+    throwDb(issuesError, "读取问题列表");
+  }
+
+  const note = input.note?.trim() || null;
+  let assignedCount = 0;
+  let skippedCount = 0;
+  const updatedIssues: AssignTaskRemediationResult["issues"] = [];
+
+  for (const row of issueRows ?? []) {
+    const status = isWorkflowStatus(row.workflow_status)
+      ? row.workflow_status
+      : "pending_review";
+
+    if (status === "confirmed") {
+      const result = await transitionIssue(admin, {
+        issueId: row.id,
+        actorId: input.actorId,
+        actorRole: input.actorRole,
+        toStatus: "remediating",
+        assigneeEmail,
+        note: note ?? "项目级分派整改",
+      });
+      assignedCount += 1;
+      updatedIssues.push({
+        id: result.id,
+        workflowStatus: result.workflowStatus,
+        assigneeId: result.assigneeId,
+        assigneeEmail: result.assigneeEmail,
+      });
+      continue;
+    }
+
+    if (status === "remediating") {
+      if (row.assignee_id === assigneeId) {
+        skippedCount += 1;
+        updatedIssues.push({
+          id: row.id,
+          workflowStatus: status,
+          assigneeId,
+          assigneeEmail,
+        });
+        continue;
+      }
+
+      const now = new Date().toISOString();
+      const { error: updateError } = await admin
+        .from("audit_issues")
+        .update({
+          assignee_id: assigneeId,
+          status_updated_at: now,
+          status_updated_by: input.actorId,
+        })
+        .eq("id", row.id);
+
+      if (updateError) {
+        throwDb(updateError, "更新项目分派人");
+      }
+
+      const { error: eventError } = await admin
+        .from("audit_issue_events")
+        .insert({
+          issue_id: row.id,
+          actor_id: input.actorId,
+          from_status: status,
+          to_status: status,
+          note: note ?? "项目级重新分派对接人",
+        });
+
+      if (eventError) {
+        console.warn(
+          "[issue-workflow] reassign event insert failed:",
+          dbMessage(eventError),
+        );
+      }
+
+      assignedCount += 1;
+      updatedIssues.push({
+        id: row.id,
+        workflowStatus: status,
+        assigneeId,
+        assigneeEmail,
+      });
+      continue;
+    }
+
+    skippedCount += 1;
+  }
+
+  const actionableCount = (issueRows ?? []).filter((row) => {
+    const status = isWorkflowStatus(row.workflow_status)
+      ? row.workflow_status
+      : "pending_review";
+    return status === "confirmed" || status === "remediating";
+  }).length;
+
+  if (actionableCount === 0) {
+    throw new Error(
+      "没有可分派的问题：请先将风险项「确认风险」，再分派本项目",
+    );
+  }
+
+  return {
+    taskId: input.taskId,
+    assigneeId,
+    assigneeEmail,
+    assignedCount,
+    skippedCount,
+    issues: updatedIssues,
   };
 }

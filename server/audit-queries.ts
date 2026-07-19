@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getEmailsByUserIds } from "@/server/profiles";
 import type {
   AuditIssue,
   AuditReport,
@@ -42,6 +43,19 @@ function mapRowToAuditIssue(
     remediationSubmittedAt: mapped.remediationSubmittedAt,
     remediationSubmittedBy: mapped.remediationSubmittedBy,
   };
+}
+
+async function withAssigneeEmails(issues: AuditIssue[]): Promise<AuditIssue[]> {
+  const ids = issues
+    .map((issue) => issue.assigneeId)
+    .filter((id): id is string => Boolean(id));
+  const emailMap = await getEmailsByUserIds(ids);
+  return issues.map((issue) => ({
+    ...issue,
+    assigneeEmail: issue.assigneeId
+      ? (emailMap.get(issue.assigneeId) ?? null)
+      : null,
+  }));
 }
 
 export type AuditTaskBundle = {
@@ -92,7 +106,7 @@ export async function listAssignedIssues(
     throw error;
   }
 
-  return (data ?? []).map(mapRowToAuditIssue);
+  return withAssigneeEmails((data ?? []).map(mapRowToAuditIssue));
 }
 
 export async function getLatestCompletedTaskBundle(
@@ -171,7 +185,9 @@ export async function getAuditTaskBundle(
       ...task,
       status: task.status as TaskStatus,
     },
-    issues: (issueRows ?? []).map(mapRowToAuditIssue),
+    issues: await withAssigneeEmails(
+      (issueRows ?? []).map(mapRowToAuditIssue),
+    ),
     report: reportRow ? mapReportRow(reportRow) : null,
   };
 }
