@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
-const protectedPrefixes = ["/dashboard", "/upload", "/report", "/me"];
+const protectedPrefixes = ["/dashboard", "/upload", "/report", "/me", "/settings"];
 
 function isProtectedPath(pathname: string) {
   return protectedPrefixes.some(
@@ -46,6 +46,8 @@ export const config = {
     "/upload/:path*",
     "/report/:path*",
     "/me",
+    "/settings",
+    "/settings/:path*",
     "/login",
   ],
 };

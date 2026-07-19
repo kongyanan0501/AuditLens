@@ -3,22 +3,40 @@
 import { useState } from "react";
 import { Check, Copy, Download, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { withExportMetadata } from "@/lib/report-export";
 
 type ReportActionsProps = {
   content: string;
   taskId: string;
   fileName?: string;
+  exportedBy: string;
+  ruleConfigVersion?: number | null;
 };
 
 export function ReportActions({
   content,
   taskId,
   fileName,
+  exportedBy,
+  ruleConfigVersion,
 }: ReportActionsProps) {
   const [copied, setCopied] = useState(false);
 
+  const buildExportBody = () =>
+    withExportMetadata(content, {
+      taskId,
+      fileName,
+      exportedBy,
+      ruleConfigVersion,
+      exportedAt: new Date().toLocaleString("zh-CN", {
+        timeZone: "Asia/Shanghai",
+        hour12: false,
+      }),
+    });
+
   const handleDownload = () => {
-    const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+    const body = buildExportBody();
+    const blob = new Blob([body], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     const shortId = taskId.slice(0, 8);
@@ -30,7 +48,7 @@ export function ReportActions({
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(content);
+      await navigator.clipboard.writeText(buildExportBody());
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
     } catch {

@@ -1,12 +1,11 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 
 export function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { signIn } = useAuth();
   const [email, setEmail] = useState("");

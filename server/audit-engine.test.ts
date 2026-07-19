@@ -90,11 +90,20 @@ describe("rules", () => {
     assert.equal(issues.length, 1);
     assert.equal(issues[0]?.type, "approval");
     assert.equal(issues[0]?.metadata?.recordIndex, 6);
+    assert.equal(issues[0]?.metadata?.ruleId, "R-APR-001");
+  });
+
+  it("skips approval check below configured min amount", () => {
+    const issues = detectMissingApproval(sampleRecords, {
+      approvalRequiredMinAmount: 500,
+    });
+    assert.equal(issues.length, 0);
   });
 
   it("runRuleCheck merges duplicate and approval issues", () => {
     const issues = runRuleCheck(sampleRecords);
     assert.equal(issues.length, 2);
+    assert.equal(issues[0]?.metadata?.ruleId, "R-DUP-001");
   });
 });
 

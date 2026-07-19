@@ -7,12 +7,34 @@ import {
   assemblePolicyContext,
   buildExplainPrompt,
   buildRetrievalQuery,
+  citationFromSearchHit,
   collectHighRiskItems,
+  formatPolicyCitation,
   isRagConfigured,
   parseExplanationResponse,
   runRagExplain,
 } from "@/server/rag";
 import type { AuditAnomaly, AuditIssue } from "@/types/audit";
+
+describe("formatPolicyCitation", () => {
+  it("uses book-title marks and clause id", () => {
+    assert.equal(
+      formatPolicyCitation("费用报销管理办法", "第12条"),
+      "《费用报销管理办法》第12条",
+    );
+  });
+
+  it("citationFromSearchHit reads metadata", () => {
+    assert.equal(
+      citationFromSearchHit({
+        id: "1",
+        score: 0.9,
+        metadata: { policyName: "采购与供应商管理办法", clauseId: "第15条" },
+      }),
+      "《采购与供应商管理办法》第15条",
+    );
+  });
+});
 
 describe("buildRetrievalQuery", () => {
   it("includes type, severity, and reason", () => {
@@ -31,7 +53,7 @@ describe("buildRetrievalQuery", () => {
 });
 
 describe("assemblePolicyContext", () => {
-  it("formats search hits with category and content", () => {
+  it("formats search hits with policy citation", () => {
     const context = assemblePolicyContext([
       {
         id: "kb-1",
@@ -39,12 +61,15 @@ describe("assemblePolicyContext", () => {
         metadata: {
           category: "duplicate",
           content: "同一 invoiceId 不得重复入账。",
+          policyName: "费用报销管理办法",
+          clauseId: "第12条",
         },
       },
     ]);
 
     assert.match(context, /duplicate/);
     assert.match(context, /同一 invoiceId/);
+    assert.match(context, /《费用报销管理办法》第12条/);
   });
 
   it("returns fallback when no hits", () => {

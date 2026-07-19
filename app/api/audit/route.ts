@@ -5,6 +5,11 @@ import {
   updateAuditTask,
 } from "@/server/audit-repository";
 import { runAuditGraph } from "@/server/langgraph";
+import { getUserRole } from "@/server/profiles";
+import {
+  getActiveRuleConfig,
+  toRuntimeThresholds,
+} from "@/server/rule-config";
 import { createClientForRouteHandler } from "@/lib/supabase/route";
 import { validateUploadFile } from "@/lib/upload-constraints";
 
@@ -21,6 +26,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "请先登录", code: "UNAUTHORIZED" },
         { status: 401 },
+      );
+    }
+
+    const role = await getUserRole(supabase, user.id);
+    if (role !== "auditor") {
+      return NextResponse.json(
+        { error: "仅审计角色可上传并发起分析", code: "FORBIDDEN" },
+        { status: 403 },
       );
     }
 
@@ -47,11 +60,13 @@ export async function POST(request: NextRequest) {
 
     await updateAuditTask(supabase, taskId, user.id, { status: "running" });
 
+    const activeConfig = await getActiveRuleConfig(supabase);
     const finalState = await runAuditGraph({
       taskId,
       userId: user.id,
       fileName: fileValue.name,
       fileContent,
+      ruleConfig: toRuntimeThresholds(activeConfig),
     });
 
     if (finalState.status === "failed") {
@@ -87,10 +102,24 @@ export async function POST(request: NextRequest) {
     return successResponse;
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "服务器内部错误";
+      error instanceof Error
+        ? error.message
+        : error &&
+            typeof error === "object" &&
+            "message" in error &&
+            typeof (error as { message: unknown }).message === "string"
+          ? (error as { message: string }).message
+          : "服务器内部错误";
+
+    console.error("[api/audit POST]", error);
+
+    const hint =
+      message.includes("schema cache") || message.includes("PGRST205")
+        ? " Supabase API 未识别新表：请在 SQL Editor 执行 notify pgrst, 'reload schema';，或 Pause 后再 Restore 项目。"
+        : "";
 
     return NextResponse.json(
-      { error: message, code: "INTERNAL_ERROR" },
+      { error: `${message}${hint}`, code: "INTERNAL_ERROR" },
       { status: 500 },
     );
   }

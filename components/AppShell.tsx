@@ -2,24 +2,40 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
+  Settings2,
   Upload,
   User,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import type { UserRole } from "@/types/audit";
 
 type NavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
+  /** If set, only these roles see the item; omit = all authenticated */
+  roles?: UserRole[];
 };
 
 const navItems: NavItem[] = [
   { href: "/dashboard", label: "仪表盘", icon: LayoutDashboard },
-  { href: "/upload", label: "上传分析", icon: Upload },
+  {
+    href: "/upload",
+    label: "上传分析",
+    icon: Upload,
+    roles: ["auditor"],
+  },
+  {
+    href: "/settings/rules",
+    label: "规则配置",
+    icon: Settings2,
+    roles: ["auditor"],
+  },
   { href: "/me", label: "我的", icon: User },
 ];
 
@@ -29,9 +45,12 @@ function isActivePath(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function getPageTitle(pathname: string) {
-  if (pathname.startsWith("/dashboard")) return "审计仪表盘";
+function getPageTitle(pathname: string, role: UserRole | null) {
+  if (pathname.startsWith("/dashboard")) {
+    return role === "business" ? "我的待办" : "审计仪表盘";
+  }
   if (pathname.startsWith("/upload")) return "上传分析";
+  if (pathname.startsWith("/settings/rules")) return "规则配置";
   if (pathname.startsWith("/me")) return "我的";
   if (pathname.startsWith("/report")) return "审计报告";
   return "AuditLens AI";
@@ -39,7 +58,29 @@ function getPageTitle(pathname: string) {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [role, setRole] = useState<UserRole | null>(null);
   const hideShell = HIDDEN_SHELL_PATHS.some((path) => pathname === path);
+
+  useEffect(() => {
+    if (hideShell) return;
+    let cancelled = false;
+    void fetch("/api/profile")
+      .then(async (response) => {
+        if (!response.ok) return;
+        const json = (await response.json()) as {
+          data?: { role: UserRole };
+        };
+        if (!cancelled && json.data?.role) {
+          setRole(json.data.role);
+        }
+      })
+      .catch(() => {
+        /* ignore — nav falls back to auditor-visible items until role loads */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hideShell]);
 
   if (hideShell) {
     return (
@@ -52,7 +93,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const pageTitle = getPageTitle(pathname);
+  // Default to showing auditor nav until profile loads; hide once role=business
+  const visibleNav = navItems.filter(
+    (item) => !item.roles || role !== "business" || item.roles.includes(role),
+  );
+  const pageTitle = getPageTitle(pathname, role);
 
   return (
     <div className="al-canvas flex min-h-[100dvh] bg-background">
@@ -67,7 +112,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="relative flex-1 space-y-0.5 px-3">
-          {navItems.map((item) => {
+          {visibleNav.map((item) => {
             const active = isActivePath(pathname, item.href);
             const Icon = item.icon;
 
@@ -115,7 +160,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <ThemeToggle className="hidden md:inline-flex" showLabel />
               <ThemeToggle className="md:hidden" />
               <nav className="flex items-center gap-1 md:hidden">
-              {navItems.map((item) => {
+              {visibleNav.map((item) => {
                 const active = isActivePath(pathname, item.href);
                 const Icon = item.icon;
 

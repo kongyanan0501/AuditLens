@@ -1,12 +1,12 @@
 import { redirect } from "next/navigation";
-import { UploadCard } from "@/components/UploadCard";
+import { RuleConfigForm } from "@/components/RuleConfigForm";
 import { PageHeader } from "@/components/PageHeader";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/supabase/require-auth";
 import { getUserRole } from "@/server/profiles";
 
-export default async function UploadPage() {
-  const user = await requireAuth("/upload");
+export default async function RuleSettingsPage() {
+  const user = await requireAuth("/settings/rules");
   const supabase = await createClient();
   const role = await getUserRole(supabase, user.id);
 
@@ -17,10 +17,10 @@ export default async function UploadPage() {
   return (
     <section className="mx-auto max-w-2xl space-y-8">
       <PageHeader
-        title="上传财务数据"
-        description="支持 Excel / CSV 格式。上传后将触发 LangGraph 审计流水线，自动完成规则检测、异常分析与风险评分。"
+        title="规则配置"
+        description="调整金额异常倍数、供应商集中阈值与必审金额；变更须备注并写入新版本"
       />
-      <UploadCard />
+      <RuleConfigForm />
     </section>
   );
 }

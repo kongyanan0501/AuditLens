@@ -11,6 +11,7 @@ import type {
   AuditIssue,
   AuditRecord,
   IssueExplanation,
+  RuleThresholdConfig,
   TaskStatus,
 } from "@/types/audit";
 
@@ -19,6 +20,7 @@ const AuditStateAnnotation = Annotation.Root({
   userId: Annotation<string | undefined>,
   fileName: Annotation<string | undefined>,
   fileContent: Annotation<Uint8Array | undefined>,
+  ruleConfig: Annotation<RuleThresholdConfig | undefined>,
   records: Annotation<AuditRecord[]>,
   issues: Annotation<AuditIssue[]>,
   anomalies: Annotation<AuditAnomaly[]>,
@@ -57,13 +59,13 @@ async function parseExcelNode(state: GraphState): Promise<Partial<GraphState>> {
 }
 
 async function ruleCheckNode(state: GraphState): Promise<Partial<GraphState>> {
-  return { issues: runRuleCheck(state.records) };
+  return { issues: runRuleCheck(state.records, state.ruleConfig) };
 }
 
 async function anomalyDetectionNode(
   state: GraphState,
 ): Promise<Partial<GraphState>> {
-  return { anomalies: runAnomalyDetection(state.records) };
+  return { anomalies: runAnomalyDetection(state.records, state.ruleConfig) };
 }
 
 async function riskScoringNode(
@@ -126,6 +128,7 @@ export async function runAuditGraph(
     userId: input.userId,
     fileName: input.fileName,
     fileContent: input.fileContent,
+    ruleConfig: input.ruleConfig,
     records: input.records ?? [],
     issues: input.issues ?? [],
     anomalies: input.anomalies ?? [],

@@ -131,6 +131,19 @@ function resolveEvidence(
   });
 }
 
+function formatRuleHitLine(metadata: Record<string, unknown> | undefined): string | null {
+  if (!metadata) return null;
+  const ruleId = typeof metadata.ruleId === "string" ? metadata.ruleId : null;
+  if (!ruleId) return null;
+  const version =
+    typeof metadata.ruleVersion === "number" ? ` v${metadata.ruleVersion}` : "";
+  const thresholds =
+    metadata.thresholds && typeof metadata.thresholds === "object"
+      ? `；阈值 ${JSON.stringify(metadata.thresholds)}`
+      : "";
+  return `   - 规则：${ruleId}${version}${thresholds}`;
+}
+
 function formatFindingLine(
   index: number,
   item: ReportItem,
@@ -138,10 +151,14 @@ function formatFindingLine(
 ): string {
   const severity = SEVERITY_LABELS[item.severity];
   const recommendation = formatRecommendation(item);
+  const ruleHit = formatRuleHitLine(item.metadata);
   const evidenceMarkdown = formatEvidenceMarkdown(
     resolveEvidence(item, records),
   );
   const lines = [`${index}. **[${severity}]** ${item.reason}`];
+  if (ruleHit) {
+    lines.push(ruleHit);
+  }
   if (recommendation) {
     lines.push(`   - 建议：${recommendation}`);
   }

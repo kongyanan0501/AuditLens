@@ -21,39 +21,107 @@ import type {
 
 const DEFAULT_TOP_K = 5;
 
-/** 知识库种子条目 — 与 scripts/seed-knowledge-base.ts 共享 */
+/** 制度知识库种子（报销 / 授权 / 采购各 ≥2 条）— 与 scripts/seed-knowledge-base.ts 共享 */
 export const KNOWLEDGE_SEED_ENTRIES = [
   {
     id: "550e8400-e29b-41d4-a716-446655440001",
     category: "duplicate",
+    policyName: "费用报销管理办法",
+    clauseId: "第12条",
     content:
-      "同一 invoiceId 不得重复入账。重复发票可能导致虚增成本或重复付款，需立即核对原始凭证并作废重复条目。",
+      "同一发票号码（invoiceId）不得重复入账或重复报销。发现重复报销的，财务应拒绝支付并追溯已付款项；情节严重的按虚增成本或重复付款风险移交内审核查。",
+  },
+  {
+    id: "550e8400-e29b-41d4-a716-446655440006",
+    category: "approval",
+    policyName: "费用报销管理办法",
+    clauseId: "第6条",
+    content:
+      "报销单据须附合法有效发票、业务说明及部门负责人签核；无票或要素不全的报销申请不得入账。差旅、招待等费用须符合公司标准并保留行程或招待对象记录。",
   },
   {
     id: "550e8400-e29b-41d4-a716-446655440002",
     category: "approval",
+    policyName: "财务授权与审批制度",
+    clauseId: "第8条",
     content:
-      "所有支出类交易须经授权审批人签字或系统审批后方可入账。缺少审批的记录存在内控缺陷风险。",
+      "达到公司设定必审金额门槛的支出事项，须经授权审批人签字或系统审批后方可入账付款。缺少有效审批的支出记录视为内控缺陷，不得作为合规付款依据。",
+  },
+  {
+    id: "550e8400-e29b-41d4-a716-446655440007",
+    category: "approval",
+    policyName: "财务授权与审批制度",
+    clauseId: "第4条",
+    content:
+      "授权实行分级管理：普通支出、大额资金与特殊事项分别对应不同审批层级。越权审批或代签无效；系统中审批人字段须与授权矩阵一致并可追溯。",
   },
   {
     id: "550e8400-e29b-41d4-a716-446655440003",
     category: "anomaly",
+    policyName: "大额资金与异常支出监控细则",
+    clauseId: "第5.2款",
     content:
-      "单笔金额超过历史均值 5 倍需触发二级审批与异常说明。大额波动可能暗示录入错误或潜在舞弊。",
+      "单笔支出金额超过同期样本均值达到公司配置倍数的，应触发二级审批并附异常说明。大额异常波动可能暗示录入错误、拆单规避或潜在舞弊，须留存复核底稿。",
   },
   {
     id: "550e8400-e29b-41d4-a716-446655440004",
     category: "vendor_concentration",
+    policyName: "采购与供应商管理办法",
+    clauseId: "第15条",
     content:
-      "单一供应商支出占比超过 50% 需评估供应集中风险与关联交易合规性，必要时要求补充说明。",
+      "单一供应商在统计期间支出占比超过公司配置阈值时，业务与采购须评估供应集中风险、关联交易与替代方案，并形成书面说明提交内控复核。",
+  },
+  {
+    id: "550e8400-e29b-41d4-a716-446655440008",
+    category: "vendor_concentration",
+    policyName: "采购与供应商管理办法",
+    clauseId: "第9条",
+    content:
+      "供应商准入须完成资质核验与比价或招标程序；严禁未入库供应商直接结算。关联方供应商须额外披露并经合规复核后方可合作。",
   },
   {
     id: "550e8400-e29b-41d4-a716-446655440005",
     category: "general",
+    policyName: "内部控制基本规范实施细则",
+    clauseId: "第3条",
     content:
-      "财务审计应遵循职责分离原则，确保录入、审批、复核由不同岗位完成，降低舞弊与差错风险。",
+      "财务相关岗位须遵循职责分离：录入、审批、复核应由不同人员完成，禁止一人包办全流程，以降低舞弊与差错风险。",
   },
 ] as const;
+
+/** Canonical citation: 《制度名》条款号 */
+export function formatPolicyCitation(
+  policyName: string,
+  clauseId: string,
+): string {
+  return `《${policyName}》${clauseId}`;
+}
+
+export function citationFromSearchHit(
+  result: SearchResult | undefined,
+): string | undefined {
+  if (!result?.metadata) return undefined;
+  const policyName =
+    typeof result.metadata.policyName === "string"
+      ? result.metadata.policyName
+      : undefined;
+  const clauseId =
+    typeof result.metadata.clauseId === "string"
+      ? result.metadata.clauseId
+      : undefined;
+  if (policyName && clauseId) {
+    return formatPolicyCitation(policyName, clauseId);
+  }
+  return undefined;
+}
+
+export function formatKnowledgeSeedText(entry: {
+  policyName: string;
+  clauseId: string;
+  content: string;
+}): string {
+  return `【${formatPolicyCitation(entry.policyName, entry.clauseId)}】${entry.content}`;
+}
 
 export type RagDependencies = {
   llm: LLMProvider;
@@ -107,9 +175,21 @@ export function assemblePolicyContext(results: SearchResult[]): string {
         typeof result.metadata?.category === "string"
           ? result.metadata.category
           : "general";
+      const policyName =
+        typeof result.metadata?.policyName === "string"
+          ? result.metadata.policyName
+          : undefined;
+      const clauseId =
+        typeof result.metadata?.clauseId === "string"
+          ? result.metadata.clauseId
+          : undefined;
       const score = result.score.toFixed(3);
+      const citation =
+        policyName && clauseId
+          ? formatPolicyCitation(policyName, clauseId)
+          : policyName || "未标注条款";
 
-      return `[${index + 1}] 分类：${category} | 相关度：${score}\n${content}`;
+      return `[${index + 1}] ${citation} | 分类：${category} | 相关度：${score}\n${content}`;
     })
     .join("\n\n");
 }
@@ -198,7 +278,7 @@ export function buildExplainPrompt(
     "",
     "## 输出要求",
     "仅返回 JSON，不要 markdown 代码块：",
-    '{ "summary": "为什么构成风险（2-3句）", "ruleReference": "引用的政策要点", "recommendation": "可执行的整改建议" }',
+    '{ "summary": "为什么构成风险（2-3句）", "ruleReference": "须引用制度名+条款号，如《费用报销管理办法》第12条", "recommendation": "可执行的整改建议" }',
   ].join("\n");
 }
 
@@ -230,13 +310,21 @@ export function parseExplanationResponse(raw: string): ParsedExplanation {
   };
 }
 
+export async function retrievePolicyHits(
+  query: string,
+  deps: Pick<RagDependencies, "llm" | "vectorStore">,
+  topK = DEFAULT_TOP_K,
+): Promise<SearchResult[]> {
+  const embedding = await deps.llm.embed(query);
+  return deps.vectorStore.search(embedding, topK);
+}
+
 export async function retrievePolicyContext(
   query: string,
   deps: Pick<RagDependencies, "llm" | "vectorStore">,
   topK = DEFAULT_TOP_K,
 ): Promise<string> {
-  const embedding = await deps.llm.embed(query);
-  const results = await deps.vectorStore.search(embedding, topK);
+  const results = await retrievePolicyHits(query, deps, topK);
   return assemblePolicyContext(results);
 }
 
@@ -259,6 +347,7 @@ function enrichIssue(
       originalReason: issue.reason,
       ruleReference: explanation.ruleReference,
       recommendation: explanation.recommendation,
+      aiExplanationText: explanation.summary,
       llmExplained: true,
     },
   };
@@ -276,6 +365,7 @@ function enrichAnomaly(
       originalReason: anomaly.reason,
       ruleReference: explanation.ruleReference,
       recommendation: explanation.recommendation,
+      aiExplanationText: explanation.summary,
       llmExplained: true,
     },
   };
@@ -287,17 +377,23 @@ export async function explainRiskItem(
   deps: RagDependencies,
 ): Promise<{ explanation: IssueExplanation; parsed: ParsedExplanation }> {
   const query = buildRetrievalQuery(riskItem.item);
-  const policyContext = await retrievePolicyContext(query, deps);
+  const hits = await retrievePolicyHits(query, deps);
+  const policyContext = assemblePolicyContext(hits);
   const prompt = buildExplainPrompt(riskItem, policyContext, state.records);
   const raw = await deps.llm.chat(prompt);
   const parsed = parseExplanationResponse(raw);
+  const fallbackCitation = citationFromSearchHit(hits[0]);
+  const ruleReference =
+    parsed.ruleReference && parsed.ruleReference.includes("《")
+      ? parsed.ruleReference
+      : fallbackCitation ?? parsed.ruleReference;
 
   return {
-    parsed,
+    parsed: { ...parsed, ruleReference },
     explanation: {
       issueId: `${riskItem.kind}-${riskItem.index}`,
       summary: parsed.summary,
-      ruleReference: parsed.ruleReference,
+      ruleReference,
       recommendation: parsed.recommendation,
     },
   };

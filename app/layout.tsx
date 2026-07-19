@@ -1,19 +1,8 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import { AppShell } from "@/components/AppShell";
 import { ThemeProvider } from "@/components/theme-provider";
 import { defaultThemeMode, themeInitScript } from "@/lib/theme-init";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "AuditLens AI",
@@ -35,9 +24,7 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} min-h-[100dvh] font-sans antialiased`}
-      >
+      <body className="min-h-[100dvh] font-sans antialiased">
         <ThemeProvider defaultTheme={defaultThemeMode}>
           <AppShell>{children}</AppShell>
         </ThemeProvider>

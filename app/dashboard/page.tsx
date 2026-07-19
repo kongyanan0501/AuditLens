@@ -19,9 +19,11 @@ import { cn } from "@/lib/utils";
 import {
   getAuditTaskBundle,
   getLatestCompletedTaskBundle,
+  listAssignedIssues,
   listUserAuditTasks,
 } from "@/server/audit-queries";
 import { buildExecutiveBrief } from "@/server/brief";
+import { getUserRole } from "@/server/profiles";
 
 type DashboardPageProps = {
   searchParams: Promise<{ taskId?: string }>;
@@ -39,11 +41,59 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const { taskId } = await searchParams;
 
   const supabase = await createClient();
+  const role = await getUserRole(supabase, user.id);
+
+  if (role === "business") {
+    let assignedIssues: Awaited<ReturnType<typeof listAssignedIssues>> = [];
+    let loadError: string | null = null;
+    try {
+      assignedIssues = await listAssignedIssues(supabase, user.id);
+    } catch (error) {
+      loadError =
+        error instanceof Error
+          ? error.message
+          : "加载待办失败，请确认已执行最新 RLS 迁移";
+      console.error("[dashboard] listAssignedIssues", error);
+    }
+
+    return (
+      <section className="space-y-8">
+        <PageHeader
+          title="我的待办"
+          description="仅显示分派给您的问题；完成后可关闭整改。"
+        />
+
+        {loadError ? (
+          <AlertBanner
+            icon={LayoutDashboard}
+            variant="error"
+            title="无法加载待办"
+            description={`${loadError}。若提示 infinite recursion / 42P17，请在 Supabase 执行 migrations/20260719030000_phase11_fix_rls_recursion.sql 后刷新。`}
+          />
+        ) : assignedIssues.length === 0 ? (
+          <Panel>
+            <EmptyState
+              icon={LayoutDashboard}
+              title="暂无分派事项"
+              description="等待审计人员确认风险并分派整改后，相关问题将出现在此。"
+            />
+          </Panel>
+        ) : (
+          <IssueWorkbench
+            issues={assignedIssues}
+            role={role}
+            currentUserId={user.id}
+          />
+        )}
+      </section>
+    );
+  }
+
   const [recentTasks, bundleFromQuery] = await Promise.all([
     listUserAuditTasks(supabase, user.id, 8),
     taskId
-      ? getAuditTaskBundle(supabase, taskId, user.id)
-      : getLatestCompletedTaskBundle(supabase, user.id),
+      ? getAuditTaskBundle(supabase, taskId, user.id, role)
+      : getLatestCompletedTaskBundle(supabase, user.id, role),
   ]);
 
   const activeTaskId = taskId ?? bundleFromQuery?.task.id;
@@ -192,6 +242,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             ) : null}
             <p className="text-xs text-muted-foreground">
               任务 ID：{bundle.task.id}
+              {bundle.task.ruleConfigVersion != null
+                ? ` · 规则 v${bundle.task.ruleConfigVersion}`
+                : ""}
             </p>
           </div>
 
@@ -232,7 +285,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               <RiskDistributionChart issues={issues} />
             </div>
             <div className="lg:col-span-3">
-              <IssueWorkbench issues={issues} />
+              <IssueWorkbench
+                key={bundle.task.id}
+                issues={issues}
+                role={role}
+                currentUserId={user.id}
+              />
             </div>
           </div>
         </>

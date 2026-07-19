@@ -6,6 +6,7 @@ import type {
   AuditIssue,
   AuditRecord,
   IssueType,
+  RuleThresholdConfig,
 } from "@/types/audit";
 import { RISK_SCORE_WEIGHTS } from "@/types/audit";
 
@@ -42,9 +43,10 @@ export function computeRiskScore(
 /** 确定性审计入口：规则 + 异常 + 评分，无需 LLM */
 export function runDeterministicAudit(
   records: AuditRecord[],
+  config?: Partial<RuleThresholdConfig>,
 ): DeterministicAuditResult {
-  const issues = runRuleCheck(records);
-  const anomalies = runAnomalyDetection(records);
+  const issues = runRuleCheck(records, config);
+  const anomalies = runAnomalyDetection(records, config);
   const score = computeRiskScore({ issues, anomalies });
 
   return { issues, anomalies, score };

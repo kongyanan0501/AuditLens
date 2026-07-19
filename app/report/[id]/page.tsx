@@ -8,6 +8,7 @@ import { RiskScoreCard } from "@/components/RiskScoreCard";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth } from "@/lib/supabase/require-auth";
 import { getAuditTaskBundle } from "@/server/audit-queries";
+import { getUserRole } from "@/server/profiles";
 import { notFound } from "next/navigation";
 
 type ReportPageProps = {
@@ -19,7 +20,8 @@ export default async function ReportPage({ params }: ReportPageProps) {
   const user = await requireAuth(`/report/${id}`);
 
   const supabase = await createClient();
-  const bundle = await getAuditTaskBundle(supabase, id, user.id);
+  const role = await getUserRole(supabase, user.id);
+  const bundle = await getAuditTaskBundle(supabase, id, user.id, role);
 
   if (!bundle) {
     notFound();
@@ -78,6 +80,8 @@ export default async function ReportPage({ params }: ReportPageProps) {
           content={bundle.report.content}
           taskId={bundle.task.id}
           fileName={bundle.task.fileName}
+          exportedBy={user.email ?? user.id}
+          ruleConfigVersion={bundle.task.ruleConfigVersion}
         />
       ) : null}
 

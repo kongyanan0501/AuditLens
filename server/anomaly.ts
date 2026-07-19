@@ -1,10 +1,40 @@
-import type { AuditAnomaly, AuditRecord } from "@/types/audit";
+import { ruleHitMeta } from "@/server/rule-config";
+import type {
+  AuditAnomaly,
+  AuditRecord,
+  RuleThresholdConfig,
+} from "@/types/audit";
+import {
+  DEFAULT_RULE_SCOPE,
+  DEFAULT_RULE_THRESHOLDS,
+  RULE_IDS,
+} from "@/types/audit";
 
-/** 单笔金额超过历史均值的倍数阈值（docs/init.md §8.3） */
-export const AMOUNT_ANOMALY_MULTIPLIER = 5;
+/** @deprecated Prefer config.amountAnomalyMultiplier; kept for tests */
+export const AMOUNT_ANOMALY_MULTIPLIER =
+  DEFAULT_RULE_THRESHOLDS.amountAnomalyMultiplier;
 
-/** 单一供应商支出金额占比阈值 */
-export const VENDOR_CONCENTRATION_THRESHOLD = 0.5;
+/** @deprecated Prefer config.vendorConcentrationThreshold; kept for tests */
+export const VENDOR_CONCENTRATION_THRESHOLD =
+  DEFAULT_RULE_THRESHOLDS.vendorConcentrationThreshold;
+
+function resolveConfig(
+  config?: Partial<RuleThresholdConfig>,
+): RuleThresholdConfig {
+  return {
+    amountAnomalyMultiplier:
+      config?.amountAnomalyMultiplier ??
+      DEFAULT_RULE_THRESHOLDS.amountAnomalyMultiplier,
+    vendorConcentrationThreshold:
+      config?.vendorConcentrationThreshold ??
+      DEFAULT_RULE_THRESHOLDS.vendorConcentrationThreshold,
+    approvalRequiredMinAmount:
+      config?.approvalRequiredMinAmount ??
+      DEFAULT_RULE_THRESHOLDS.approvalRequiredMinAmount,
+    version: config?.version ?? 1,
+    scopeKey: config?.scopeKey ?? DEFAULT_RULE_SCOPE,
+  };
+}
 
 function averageAmount(records: AuditRecord[]): number {
   if (records.length === 0) return 0;
@@ -12,14 +42,17 @@ function averageAmount(records: AuditRecord[]): number {
   return total / records.length;
 }
 
-/** amount > avg × 5 */
+/** amount > avg × multiplier */
 export function detectAmountAnomalies(
   records: AuditRecord[],
+  config?: Partial<RuleThresholdConfig>,
 ): AuditAnomaly[] {
+  const resolved = resolveConfig(config);
+  const multiplier = resolved.amountAnomalyMultiplier;
   const avg = averageAmount(records);
   if (avg <= 0) return [];
 
-  const threshold = avg * AMOUNT_ANOMALY_MULTIPLIER;
+  const threshold = avg * multiplier;
   const anomalies: AuditAnomaly[] = [];
 
   records.forEach((record, index) => {
@@ -27,14 +60,19 @@ export function detectAmountAnomalies(
 
     anomalies.push({
       type: "anomaly",
-      severity: record.amount >= avg * AMOUNT_ANOMALY_MULTIPLIER * 2 ? "high" : "medium",
-      reason: `金额 ${record.amount} 超过均值 ${avg.toFixed(2)} 的 ${AMOUNT_ANOMALY_MULTIPLIER} 倍`,
+      severity: record.amount >= avg * multiplier * 2 ? "high" : "medium",
+      reason: `金额 ${record.amount} 超过均值 ${avg.toFixed(2)} 的 ${multiplier} 倍`,
       recordIndex: index,
       metadata: {
         amount: record.amount,
         average: avg,
         threshold,
         invoiceId: record.invoiceId,
+        ...ruleHitMeta(RULE_IDS.anomaly, resolved, {
+          amountAnomalyMultiplier: multiplier,
+          average: avg,
+          threshold,
+        }),
       },
     });
   });
@@ -42,10 +80,13 @@ export function detectAmountAnomalies(
   return anomalies;
 }
 
-/** 单一 vendor 支出金额占比超过 50% */
+/** 单一 vendor 支出金额占比超过配置阈值 */
 export function detectVendorConcentration(
   records: AuditRecord[],
+  config?: Partial<RuleThresholdConfig>,
 ): AuditAnomaly[] {
+  const resolved = resolveConfig(config);
+  const shareThreshold = resolved.vendorConcentrationThreshold;
   const expenses = records.filter(
     (record) => record.type === "expense" && record.vendor.trim() !== "",
   );
@@ -64,13 +105,22 @@ export function detectVendorConcentration(
 
   for (const [vendor, amount] of byVendor) {
     const share = amount / total;
-    if (share <= VENDOR_CONCENTRATION_THRESHOLD) continue;
+    if (share <= shareThreshold) continue;
 
     anomalies.push({
       type: "vendor_concentration",
-      severity: share >= 0.7 ? "high" : "medium",
-      reason: `供应商「${vendor}」支出占比 ${(share * 100).toFixed(1)}%，超过 ${VENDOR_CONCENTRATION_THRESHOLD * 100}% 阈值`,
-      metadata: { vendor, amount, total, share },
+      severity: share >= Math.min(0.7, shareThreshold + 0.2) ? "high" : "medium",
+      reason: `供应商「${vendor}」支出占比 ${(share * 100).toFixed(1)}%，超过 ${shareThreshold * 100}% 阈值`,
+      metadata: {
+        vendor,
+        amount,
+        total,
+        share,
+        ...ruleHitMeta(RULE_IDS.vendorConcentration, resolved, {
+          vendorConcentrationThreshold: shareThreshold,
+          share,
+        }),
+      },
     });
   }
 
@@ -78,9 +128,12 @@ export function detectVendorConcentration(
 }
 
 /** AnomalyDetection 节点：金额异常 + 供应商集中 */
-export function runAnomalyDetection(records: AuditRecord[]): AuditAnomaly[] {
+export function runAnomalyDetection(
+  records: AuditRecord[],
+  config?: Partial<RuleThresholdConfig>,
+): AuditAnomaly[] {
   return [
-    ...detectAmountAnomalies(records),
-    ...detectVendorConcentration(records),
+    ...detectAmountAnomalies(records, config),
+    ...detectVendorConcentration(records, config),
   ];
 }

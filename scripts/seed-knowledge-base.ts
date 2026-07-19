@@ -15,7 +15,10 @@ import {
 import { loadEnvFiles } from "../lib/load-env";
 import { createVectorStore } from "../lib/pinecone";
 import { createAdminClient } from "../lib/supabase/admin";
-import { KNOWLEDGE_SEED_ENTRIES } from "../server/rag";
+import {
+  formatKnowledgeSeedText,
+  KNOWLEDGE_SEED_ENTRIES,
+} from "../server/rag";
 
 loadEnvFiles();
 
@@ -95,10 +98,11 @@ async function main() {
   console.log(`Pinecone index: ${indexName}`);
 
   for (const entry of KNOWLEDGE_SEED_ENTRIES) {
+    const text = formatKnowledgeSeedText(entry);
     let embedding: number[];
 
     try {
-      embedding = await llm.embed(entry.content);
+      embedding = await llm.embed(text);
     } catch (error) {
       throw new Error(formatSeedError("embedding", entry.id, error));
     }
@@ -115,8 +119,10 @@ async function main() {
           id: entry.id,
           values: embedding,
           metadata: {
-            content: entry.content,
+            content: text,
             category: entry.category,
+            policyName: entry.policyName,
+            clauseId: entry.clauseId,
           },
         },
       ]);
@@ -124,15 +130,45 @@ async function main() {
       throw new Error(formatSeedError("Pinecone upsert", entry.id, error));
     }
 
-    const { error } = await supabase.from("knowledge_base").upsert(
-      {
-        id: entry.id,
-        content: entry.content,
-        category: entry.category,
-        embedding: `[${embedding.join(",")}]`,
-      },
-      { onConflict: "id" },
-    );
+    const fullRow = {
+      id: entry.id,
+      content: text,
+      category: entry.category,
+      policy_name: entry.policyName,
+      clause_id: entry.clauseId,
+      embedding: `[${embedding.join(",")}]`,
+    };
+
+    let { error } = await supabase
+      .from("knowledge_base")
+      .upsert(fullRow, { onConflict: "id" });
+
+    // PostgREST schema cache often lags after ALTER COLUMN; content already
+    // embeds 【制度 条款】 and Pinecone metadata carries policyName/clauseId.
+    if (
+      error &&
+      (error.message.includes("schema cache") ||
+        error.message.includes("clause_id") ||
+        error.message.includes("policy_name") ||
+        error.code === "PGRST204" ||
+        error.code === "PGRST205")
+    ) {
+      console.warn(
+        `  ⚠ Supabase schema cache 未识别 policy_name/clause_id，回退写入基础列（${entry.id}）`,
+      );
+      console.warn(
+        "    请在 SQL Editor 执行: notify pgrst, 'reload schema'; 后可再跑一次补全列",
+      );
+      ({ error } = await supabase.from("knowledge_base").upsert(
+        {
+          id: entry.id,
+          content: text,
+          category: entry.category,
+          embedding: `[${embedding.join(",")}]`,
+        },
+        { onConflict: "id" },
+      ));
+    }
 
     if (error) {
       throw new Error(
@@ -140,7 +176,9 @@ async function main() {
       );
     }
 
-    console.log(`  ✓ ${entry.id} (${entry.category})`);
+    console.log(
+      `  ✓ ${entry.policyName} ${entry.clauseId} (${entry.category})`,
+    );
   }
 
   console.log("Knowledge base seed complete.");
