@@ -1,0 +1,114 @@
+{
+  "project": "MyApp",
+  "title": "完整模式讲解（含 LLM 离线等待切片）",
+  "category": "Walkthrough",
+  "description": "Part0 提交任务 → off-record 等完成 → 垫片【视频加速中】→ Part1 讲结果。",
+  "output_name": "01-walkthrough-llm",
+  "viewport": { "width": 1440, "height": 900 },
+  "use_setup_login": false,
+  "show_cursor": true,
+  "steps_summary": ["登录上传", "等待（不进片）", "Live 结果讲解"],
+  "steps": [
+    {
+      "id": "open_login",
+      "action": "navigate",
+      "value": "http://localhost:3000/login",
+      "narration": "各位好。今天走完整模式：规则出硬结论，模型写说明。",
+      "highlight": "main",
+      "highlight_label": "登录页",
+      "action_ms": 800,
+      "wait_for": "#email"
+    },
+    {
+      "id": "fill_email",
+      "action": "fill",
+      "selector": "#email",
+      "value": "${email}",
+      "action_ms": 300
+    },
+    {
+      "id": "fill_password",
+      "action": "fill",
+      "selector": "#password",
+      "value": "${password}",
+      "action_ms": 300
+    },
+    {
+      "id": "submit_login",
+      "action": "click",
+      "selector": "button[type=\"submit\"]",
+      "action_ms": 700,
+      "wait_for_url": "/dashboard",
+      "wait_timeout_ms": 20000
+    },
+    {
+      "id": "pre_upload",
+      "action": "wait",
+      "narration": "先上传小样，快速跑通完整链路。",
+      "highlight": "section:has(input[type=\"file\"])",
+      "highlight_label": "上传",
+      "action_ms": 600,
+      "wait_for": "input[type=\"file\"]"
+    },
+    {
+      "id": "select_file",
+      "action": "upload",
+      "selector": "input[type=\"file\"]",
+      "value": "/ABS/PATH/TO/sample.csv",
+      "action_ms": 400
+    },
+    {
+      "id": "click_upload",
+      "action": "click",
+      "selector": "button[type=\"submit\"]",
+      "narration": "任务已创建。",
+      "action_ms": 700,
+      "wait_for": "text=上传成功",
+      "wait_timeout_ms": 45000
+    },
+    {
+      "id": "pre_llm_wait",
+      "action": "wait",
+      "narration": "模型要写计划和底稿，会等一会儿；成片里这段用加速垫片，避免干等。",
+      "highlight": "ul",
+      "highlight_label": "任务列表",
+      "action_ms": 800
+    },
+    {
+      "id": "wait_llm_done",
+      "action": "wait_job_done",
+      "value": "3",
+      "wait_timeout_ms": 180000,
+      "offrecord": true,
+      "playback_speed": 12,
+      "accelerate_caption": "【视频加速中】",
+      "action_ms": 500
+    },
+    {
+      "id": "open_live_job",
+      "action": "click",
+      "selector": "ul li:first-child a[href^=\"/jobs/\"]",
+      "action_ms": 400,
+      "wait_for_url": "/jobs/",
+      "wait_timeout_ms": 20000
+    },
+    {
+      "id": "announce_live",
+      "action": "wait",
+      "narration": "结果回来了。这是刚才 live 跑出来的页面。",
+      "highlight": "main",
+      "highlight_label": "Live 结果",
+      "action_ms": 500,
+      "wait_for": "h1",
+      "wait_timeout_ms": 20000
+    },
+    {
+      "id": "explain_result",
+      "action": "wait",
+      "narration": "硬结论来自规则；模型只写说明，不改检测结果。",
+      "highlight": "main",
+      "highlight_label": "结论区",
+      "action_ms": 1200
+    }
+  ]
+}

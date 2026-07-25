@@ -41,3 +41,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.video-docs/config.json
+.video-docs/output/
+.agents/skills/video-docs-builder/.env
+.agents/skills/video-docs-builder/node_modules/
+.agents/skills/video-docs-builder/.bin/

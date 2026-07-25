@@ -1,0 +1,8 @@
+{
+  "app_name": "MyApp",
+  "base_url": "http://localhost:3000",
+  "setup_login": {
+    "email": "demo@example.com",
+    "password": "change-me"
+  }
+}

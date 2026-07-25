@@ -1,0 +1,75 @@
+{
+  "project": "MyApp",
+  "title": "产品操作讲解（无长等待）",
+  "category": "Walkthrough",
+  "description": "登录 → 操作 → 结果。复制到目标仓库 .video-docs/flows/ 后改选择器与旁白。",
+  "output_name": "01-walkthrough",
+  "viewport": { "width": 1440, "height": 900 },
+  "use_setup_login": false,
+  "show_cursor": true,
+  "steps_summary": ["登录", "核心操作", "结果"],
+  "steps": [
+    {
+      "id": "open_login",
+      "action": "navigate",
+      "value": "http://localhost:3000/login",
+      "narration": "各位好。这是 MyApp 的两分钟操作讲解。",
+      "highlight": "main",
+      "highlight_label": "登录页",
+      "action_ms": 800,
+      "wait_for": "#email"
+    },
+    {
+      "id": "fill_email",
+      "action": "fill",
+      "selector": "#email",
+      "value": "${email}",
+      "action_ms": 300
+    },
+    {
+      "id": "fill_password",
+      "action": "fill",
+      "selector": "#password",
+      "value": "${password}",
+      "narration": "使用演示账号登录。",
+      "highlight": "form",
+      "highlight_label": "登录表单",
+      "action_ms": 400
+    },
+    {
+      "id": "submit_login",
+      "action": "click",
+      "selector": "button[type=\"submit\"]",
+      "action_ms": 700,
+      "wait_for_url": "/dashboard",
+      "wait_timeout_ms": 20000
+    },
+    {
+      "id": "show_home",
+      "action": "wait",
+      "narration": "进入工作台后，我们先完成一项核心操作。",
+      "highlight": "h1",
+      "highlight_label": "工作台",
+      "action_ms": 1000,
+      "wait_for": "h1"
+    },
+    {
+      "id": "do_action",
+      "action": "click",
+      "selector": "button:has-text(\"开始\")",
+      "narration": "点击开始，页面会进入结果区。",
+      "highlight": "button:has-text(\"开始\")",
+      "highlight_label": "开始",
+      "action_ms": 800,
+      "wait_timeout_ms": 30000
+    },
+    {
+      "id": "show_result",
+      "action": "wait",
+      "narration": "结果区展示关键结论；讲解到此结束。",
+      "highlight": "main",
+      "highlight_label": "结果",
+      "action_ms": 1200
+    }
+  ]
+}
